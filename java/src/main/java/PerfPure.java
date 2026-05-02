@@ -122,6 +122,21 @@ public class PerfPure {
         }
         print_perf("matrix_multiply", tmin);
 
+        // bfs
+        var bfsAdj = bfsCreate(5000, 20000);
+        int bfsRef = bfsSearch(bfsAdj, 0);
+        assert(bfsSearch(bfsAdj, 0) == bfsRef);
+        int bfsCnt = 0;
+        tmin = Long.MAX_VALUE;
+        for (int i = 0; i < NITER; ++i) {
+            t = System.nanoTime();
+            bfsCnt += bfsSearch(bfsAdj, 0);
+            t = System.nanoTime() - t;
+            if (t < tmin) tmin = t;
+        }
+        assert(bfsCnt == bfsRef * NITER);
+        print_perf("algorithm_graph_bfs", tmin);
+
         // printfd
         tmin = Long.MAX_VALUE;
         for (int i=0; i<NITER; ++i) {
@@ -135,13 +150,13 @@ public class PerfPure {
 
     void printfd(int n) {
         try (PrintStream ps = new PrintStream(new FileOutputStream("/dev/null"))) {
-            for (long i = 0; i < n; i++) {
-                ps.println(i + " " + (i+1));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+            for (long i = 0; i < n; i++) { ps.println(i + " " + (i+1)); }
+        } catch (IOException e) { e.printStackTrace(); }
     }
+
+    // graph BFS
+    private static java.util.ArrayList<java.util.ArrayList<Integer>> bfsCreate(int V, int E) { Random r = new Random(42); var adj = new java.util.ArrayList<java.util.ArrayList<Integer>>(V); for(int i=0;i<V;i++)adj.add(new java.util.ArrayList<>()); for(int i=0;i<E;i++){int u=r.nextInt(V),v=r.nextInt(V);adj.get(u).add(v);adj.get(v).add(u);}return adj;}
+    private static int bfsSearch(java.util.ArrayList<java.util.ArrayList<Integer>> adj, int start) { int V=adj.size(); boolean[] vis=new boolean[V]; var q=new java.util.ArrayDeque<Integer>(); q.add(start);vis[start]=true;int cnt=1; while(!q.isEmpty()){int u=q.removeFirst();for(int v:adj.get(u)){if(!vis[v]){vis[v]=true;q.addLast(v);cnt++;}}}return cnt; }
 
     private double randmatmul(int i) {
         SimpleMatrix a = SimpleMatrix.random_DDRM(i, i,  -1d, +1d, rand);
