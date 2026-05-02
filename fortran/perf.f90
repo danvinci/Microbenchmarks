@@ -181,7 +181,10 @@ use utils, only: trace, randn, std, mean, stop_error
 use types, only: dp
 implicit none
 private
-public fib, parse_int, printfd, quicksort, mandelperf, pisum, randmatstat, randmatmul
+public fib, parse_int, printfd, quicksort, mandelperf, pisum, randmatstat, randmatmul, &
+    bfs_create, bfs_search, bfs_offset, bfs_edges
+
+integer, allocatable :: bfs_offset(:), bfs_edges(:), bfs_V
 
 contains
 
@@ -192,6 +195,73 @@ if (n < 2) then
 else
     r = fib(n-1) + fib(n-2)
 end if
+end function
+
+! graph BFS
+
+subroutine bfs_seed_fixed()
+    integer :: n
+    integer, allocatable :: seed(:)
+    call random_seed(size=n)
+    allocate(seed(n)); seed = 42
+    call random_seed(put=seed)
+    deallocate(seed)
+end subroutine
+
+integer function bfs_rand(m) result(r)
+    integer, intent(in) :: m
+    real :: x
+    call random_number(x)
+    r = int(x * m)
+end function
+
+subroutine bfs_create(V, E)
+    integer, intent(in) :: V, E
+    integer :: i, u1, u2
+    integer, allocatable :: deg(:), ptrs(:)
+    allocate(deg(V))
+    deg = 0
+    bfs_V = V
+    call bfs_seed_fixed()
+    do i = 1, E
+        u1 = bfs_rand(V) + 1; u2 = bfs_rand(V) + 1
+        deg(u1) = deg(u1) + 1; deg(u2) = deg(u2) + 1
+    end do
+    allocate(bfs_offset(V+1))
+    bfs_offset(1) = 1
+    do i = 1, V; bfs_offset(i+1) = bfs_offset(i) + deg(i); end do
+    allocate(bfs_edges(bfs_offset(V+1)-1))
+    allocate(ptrs(V)); ptrs = bfs_offset(1:V)
+    call bfs_seed_fixed()
+    do i = 1, E
+        u1 = bfs_rand(V) + 1; u2 = bfs_rand(V) + 1
+        bfs_edges(ptrs(u1)) = u2; ptrs(u1) = ptrs(u1) + 1
+        bfs_edges(ptrs(u2)) = u1; ptrs(u2) = ptrs(u2) + 1
+    end do
+    deallocate(deg, ptrs)
+end subroutine
+
+integer function bfs_search(start) result(cnt)
+    integer, intent(in) :: start
+    integer :: n, head, tail, u, nxt, k
+    logical, allocatable :: visited(:)
+    integer, allocatable :: queue(:)
+    n = bfs_V
+    allocate(visited(n), queue(n))
+    visited = .false.
+    head = 1; tail = 1
+    queue(tail) = start; visited(start) = .true.; cnt = 1
+    do while (head <= tail)
+        u = queue(head); head = head + 1
+        do k = bfs_offset(u), bfs_offset(u+1)-1
+            nxt = bfs_edges(k)
+            if (.not. visited(nxt)) then
+                visited(nxt) = .true.
+                tail = tail + 1; queue(tail) = nxt; cnt = cnt + 1
+            end if
+        end do
+    end do
+    deallocate(visited, queue)
 end function
 
 integer function parse_int(s, base) result(n)
@@ -358,7 +428,7 @@ program perf
 use types, only: dp, i64
 use utils, only: assert, init_random_seed, sysclock2ms, hex_string
 use bench, only: fib, parse_int, printfd, quicksort, mandelperf, pisum, randmatstat, &
-    randmatmul
+    randmatmul, bfs_create, bfs_search, bfs_offset, bfs_edges
 implicit none
 
 integer, parameter :: NRUNS = 1000
@@ -368,6 +438,7 @@ integer(i64) :: t1, t2, tmin
 real(dp) :: pi, s1, s2
 real(dp), allocatable :: C(:, :), d(:)
 character(len=11) :: s
+integer :: bfs_cnt, bfs_ref
 
 call init_random_seed()
 
@@ -465,5 +536,21 @@ do i = 1, 5
     if (t2-t1 < tmin) tmin = t2-t1
 end do
 print "('fortran,matrix_multiply,',f0.6)", sysclock2ms(tmin)
+
+! bfs
+call bfs_create(5000, 20000)
+bfs_ref = bfs_search(1)
+call assert(bfs_search(1) == bfs_ref)
+bfs_cnt = 0
+tmin = huge(0_i64)
+do i = 1, 5
+    call system_clock(t1)
+    bfs_cnt = bfs_cnt + bfs_search(1)
+    call system_clock(t2)
+    if (t2-t1 < tmin) tmin = t2-t1
+end do
+call assert(bfs_cnt == bfs_ref * 5)
+deallocate(bfs_offset, bfs_edges)
+print "('fortran,algorithm_graph_bfs,',f0.6)", sysclock2ms(tmin)
 
 end program
