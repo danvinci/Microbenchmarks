@@ -31,13 +31,27 @@ fn nrand<R: Rng>(shape: (usize, usize), rng: &mut R) -> Array2<f64> {
 }
 
 fn fib(n: i32) -> i32 {
-    let n = black_box(n); // prevent over-optimization
-    if n < 2 {
-        n
-    } else {
-        fib(n - 1) + fib(n - 2)
-    }
+    let n = black_box(n);
+    if n < 2 { n } else { fib(n - 1) + fib(n - 2) }
 }
+
+// N-body simulation
+
+fn nbody_init(n: usize) -> (Vec<f64>,Vec<f64>,Vec<f64>,Vec<f64>,Vec<f64>,Vec<f64>,Vec<f64>) {
+    let mut rng = gen_rng(42u64);
+    let inv_n = 1.0 / n as f64;
+    let mut x = Vec::with_capacity(n); let mut y = Vec::with_capacity(n); let mut z = Vec::with_capacity(n);
+    let mut vx = Vec::with_capacity(n); let mut vy = Vec::with_capacity(n); let mut vz = Vec::with_capacity(n);
+    let mut m = Vec::with_capacity(n);
+    for _ in 0..n {
+        x.push(rng.gen::<f64>() * 2.0 - 1.0); y.push(rng.gen::<f64>() * 2.0 - 1.0); z.push(rng.gen::<f64>() * 2.0 - 1.0);
+        vx.push((rng.gen::<f64>() - 0.5) * 0.1); vy.push((rng.gen::<f64>() - 0.5) * 0.1); vz.push((rng.gen::<f64>() - 0.5) * 0.1);
+        m.push(rng.gen::<f64>() * inv_n);
+    }
+    (x,y,z,vx,vy,vz,m)
+}
+fn nbody_step(x:&mut[f64],y:&mut[f64],z:&mut[f64],vx:&mut[f64],vy:&mut[f64],vz:&mut[f64],m:&[f64],dt:f64) { let n=x.len(); let g=1.0; let eps2=1e-4; for i in 0..n { let mut fx=0.0;let mut fy=0.0;let mut fz=0.0; let xi=x[i];let yi=y[i];let zi=z[i]; for j in 0..n { let dx=x[j]-xi; let dy=y[j]-yi; let dz=z[j]-zi; let dsq=dx*dx+dy*dy+dz*dz+eps2; let inv=1.0/dsq.sqrt(); let inv3=inv*inv*inv; fx+=dx*inv3*m[j]; fy+=dy*inv3*m[j]; fz+=dz*inv3*m[j]; } vx[i]+=dt*g*fx; vy[i]+=dt*g*fy; vz[i]+=dt*g*fz; } for i in 0..n { x[i]+=dt*vx[i]; y[i]+=dt*vy[i]; z[i]+=dt*vz[i]; } }
+fn nbody_perf(n:usize, steps:usize, dt:f64) -> f64 { let (mut x,mut y,mut z,mut vx,mut vy,mut vz,m) = nbody_init(n); for _ in 0..steps { nbody_step(&mut x,&mut y,&mut z,&mut vx,&mut vy,&mut vz,&m,dt); } x.iter().zip(y.iter().zip(z.iter())).map(|(&a,(&b,&c))| a+b+c).sum() }
 
 fn mandel(z: Complex64) -> u32 {
     use std::iter;
@@ -300,4 +314,12 @@ fn main() {
         printfd(100000);
     });
     print_perf("print_to_file", to_float(tmin));
+
+    // nbody
+    let nb_ref = nbody_perf(1000, 10, 0.01);
+    assert!((nbody_perf(1000, 10, 0.01) - nb_ref).abs() < 1e-6);
+    let mut nb_cs = 0.0;
+    let tmin = measure_best(NITER, || { nb_cs += nbody_perf(1000, 10, 0.01); });
+    black_box(nb_cs);
+    print_perf("simulation_nbody", to_float(tmin));
 }
