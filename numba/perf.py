@@ -1,11 +1,28 @@
 from numpy import *
-from numpy.random import rand, randn
+from numpy.random import rand, randn, seed, randint
 from numpy.linalg import matrix_power
 import sys
 import time
 import random
-from numba import njit, types
-from numba.typed import List as NumbaList
+from numba import njit
+
+## groupby aggregation ##
+
+def gb_generate_n(nr, ng):
+    seed(42)
+    k = [f'g{randint(0, ng):06d}' for _ in range(nr)]
+    v = list(rand(nr))
+    return k, v
+
+def gb_aggregate_n(k, v):
+    ht = {}
+    for i in range(len(k)):
+        key = k[i]; val = v[i]
+        if key in ht: ht[key][0] += 1; ht[key][1] += val; ht[key][2] += val * val
+        else: ht[key] = [1, val, val * val]
+    cs = 0.0
+    for c, s, _ in ht.values(): cs += s / c
+    return cs
 
 ## fibonacci ##
 
@@ -200,3 +217,14 @@ if __name__ == "__main__":
         t = time.time()-t
         if t < tmin: tmin = t
     print_perf ("print_to_file", tmin)
+
+    gb_keys, gb_vals = gb_generate_n(50000, 100)
+    gb_ref = gb_aggregate_n(gb_keys, gb_vals)
+    assert gb_aggregate_n(gb_keys, gb_vals) == gb_ref
+    tmin = float('inf')
+    for i in range(mintrials):
+        t = time.time()
+        gb_aggregate_n(gb_keys, gb_vals)
+        t = time.time()-t
+        if t < tmin: tmin = t
+    print_perf("data_groupby_aggregate", tmin)
