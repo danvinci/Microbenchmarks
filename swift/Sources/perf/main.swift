@@ -35,6 +35,13 @@ func blackHole<T>(_ x: T) {
 }
 
 // ---------------------------------------------------------------------------
+// GroupBy aggregation
+// ---------------------------------------------------------------------------
+
+func gbGenerate(_ nr: Int, _ ng: Int) -> ([String], [Double]) { var k=[String](), v=[Double](); for _ in 0..<nr { k.append(String(format:"g%06d", Int.random(in: 0..<ng))); v.append(Double.random(in: 0..<1)) }; return (k,v) }
+func gbAggregate(_ keys:[String], _ vals:[Double]) -> Double { var ht=[String:(Double,Double,Double)](); for i in 0..<keys.count { let k=keys[i]; let v=vals[i]; if let a=ht[k] { ht[k]=(a.0+1, a.1+v, a.2+v*v) } else { ht[k]=(1, v, v*v) } }; var cs=0.0; for a in ht.values { cs+=a.1/a.0 }; return cs }
+
+// ---------------------------------------------------------------------------
 // Fibonacci
 // ---------------------------------------------------------------------------
 
@@ -414,3 +421,11 @@ for _ in 0..<NITER {
     if elapsed < tmin { tmin = elapsed }
 }
 printPerf("print_to_file", tmin)
+
+// groupby
+let (gbKeys, gbVals) = gbGenerate(50000, 100)
+let gbRef = gbAggregate(gbKeys, gbVals)
+precondition(abs(gbAggregate(gbKeys, gbVals) - gbRef) < 1e-6)
+var gbCs = 0.0; tmin = Double.infinity
+for _ in 0..<NITER { let t=clockNow(); gbCs+=gbAggregate(gbKeys, gbVals); let e=clockNow()-t; if e<tmin{tmin=e} }
+blackHole(gbCs); printPerf("data_groupby_aggregate", tmin)
