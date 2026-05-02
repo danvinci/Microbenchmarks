@@ -122,6 +122,19 @@ public class PerfPure {
         }
         print_perf("matrix_multiply", tmin);
 
+        // nbody
+        double nbRef = nbodyPerf(1000, 10, 0.01);
+        assert(Math.abs(nbodyPerf(1000, 10, 0.01) - nbRef) < 1e-6);
+        double nbCs = 0;
+        tmin = Long.MAX_VALUE;
+        for (int i = 0; i < NITER; ++i) {
+            t = System.nanoTime();
+            nbCs += nbodyPerf(1000, 10, 0.01);
+            t = System.nanoTime() - t;
+            if (t < tmin) tmin = t;
+        }
+        print_perf("simulation_nbody", tmin);
+
         // printfd
         tmin = Long.MAX_VALUE;
         for (int i=0; i<NITER; ++i) {
@@ -135,13 +148,14 @@ public class PerfPure {
 
     void printfd(int n) {
         try (PrintStream ps = new PrintStream(new FileOutputStream("/dev/null"))) {
-            for (long i = 0; i < n; i++) {
-                ps.println(i + " " + (i+1));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+            for (long i = 0; i < n; i++) { ps.println(i + " " + (i+1)); }
+        } catch (IOException e) { e.printStackTrace(); }
     }
+
+    // N-body simulation
+    private static double[][] nbodyInit(int n) { Random r = new Random(42); double invN = 1.0/n; double[] x=new double[n],y=new double[n],z=new double[n],vx=new double[n],vy=new double[n],vz=new double[n],m=new double[n]; for (int i=0;i<n;i++) { x[i]=r.nextDouble()*2-1; y[i]=r.nextDouble()*2-1; z[i]=r.nextDouble()*2-1; vx[i]=(r.nextDouble()-0.5)*0.1; vy[i]=(r.nextDouble()-0.5)*0.1; vz[i]=(r.nextDouble()-0.5)*0.1; m[i]=r.nextDouble()*invN; } return new double[][]{x,y,z,vx,vy,vz,m}; }
+    private static void nbodyStep(double[][] s, double dt) { int n=s[0].length; double G=1,eps2=1e-4; double[] x=s[0],y=s[1],z=s[2],vx=s[3],vy=s[4],vz=s[5],m=s[6]; for (int i=0;i<n;i++) { double fx=0,fy=0,fz=0,xi=x[i],yi=y[i],zi=z[i]; for (int j=0;j<n;j++) { double dx=x[j]-xi,dy=y[j]-yi,dz=z[j]-zi,dsq=dx*dx+dy*dy+dz*dz+eps2,inv=1.0/Math.sqrt(dsq),inv3=inv*inv*inv; fx+=dx*inv3*m[j]; fy+=dy*inv3*m[j]; fz+=dz*inv3*m[j]; } vx[i]+=dt*G*fx; vy[i]+=dt*G*fy; vz[i]+=dt*G*fz; } for (int i=0;i<n;i++) { x[i]+=dt*vx[i]; y[i]+=dt*vy[i]; z[i]+=dt*vz[i]; } }
+    private static double nbodyPerf(int n, int steps, double dt) { double[][] s = nbodyInit(n); for (int i=0;i<steps;i++) nbodyStep(s,dt); double cs=0; for (int i=0;i<n;i++) cs+=s[0][i]+s[1][i]+s[2][i]; return cs; }
 
     private double randmatmul(int i) {
         SimpleMatrix a = SimpleMatrix.random_DDRM(i, i,  -1d, +1d, rand);
