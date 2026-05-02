@@ -179,3 +179,38 @@ randmatmul = function(n) {
 
 assert(randmatmul(1000)[1] >= 0)
 timeit("matrix_multiply", randmatmul, 1000)
+
+## k-nucleotide ##
+
+kmer_alphabet = c('A', 'C', 'G', 'T')
+
+generate_dna = function(n) {
+    set.seed(42)
+    return(paste(kmer_alphabet[sample.int(4, n, replace=TRUE)], collapse=''))
+}
+
+count_kmers = function(seq, k) {
+    ht = new.env(hash=TRUE, parent=emptyenv())
+    limit = nchar(seq) - k + 1
+    for (i in 1:limit) {
+        kmer = substr(seq, i, i + k - 1)
+        if (exists(kmer, envir=ht, inherits=FALSE)) {
+            assign(kmer, get(kmer, envir=ht) + 1, envir=ht)
+        } else {
+            assign(kmer, 1, envir=ht)
+        }
+    }
+    vals = as.list(ht, all.names=TRUE)
+    return(sum(unlist(vals)))
+}
+
+k_nucleotide_perf = function(seq_len, k, iters) {
+    seq = generate_dna(seq_len)
+    s = 0
+    for (j in 1:iters) s = s + count_kmers(seq, k)
+    return(s)
+}
+
+assert(k_nucleotide_perf(50000, 8, 1) == 50000 - 8 + 1)
+knuc_ref = k_nucleotide_perf(50000, 8, 5); assert(k_nucleotide_perf(50000, 8, 5) == knuc_ref)
+timeit("string_k_nucleotide", k_nucleotide_perf, 50000, 8, 5)
