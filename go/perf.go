@@ -215,6 +215,41 @@ func pisum() float64 {
 
 const NITER = 5
 
+// k-nucleotide counting
+
+var kmerAlphabet = []byte("ACGT")
+
+func generateDna(n int) string {
+    r := rand.New(rand.NewSource(42))
+    seq := make([]byte, n)
+    for i := 0; i < n; i++ {
+        seq[i] = kmerAlphabet[r.Intn(4)]
+    }
+    return string(seq)
+}
+
+func countKmers(seq string, k int) int {
+    ht := make(map[string]int)
+    limit := len(seq) - k + 1
+    for i := 0; i < limit; i++ {
+        ht[seq[i:i+k]]++
+    }
+    total := 0
+    for _, v := range ht {
+        total += v
+    }
+    return total
+}
+
+func kNucleotidePerf(seqLen, k, iters int) int {
+    seq := generateDna(seqLen)
+    s := 0
+    for j := 0; j < iters; j++ {
+        s += countKmers(seq, k)
+    }
+    return s
+}
+
 func print_perf(name string, t float64) {
 	fmt.Printf("go,%v,%v\n", name, t*1000)
 }
@@ -293,5 +328,14 @@ func main() {
 
 	timeit("print_to_file", func() {
 		printfd(100000)
+	})
+
+	if kNucleotidePerf(50000, 8, 1) != 50000-8+1 {
+		panic("k_nucleotide_perf incorrect")
+	}
+	knucRef := kNucleotidePerf(50000, 8, 5)
+	if kNucleotidePerf(50000, 8, 5) != knucRef { panic("kNucleotidePerf not deterministic") }
+	timeit("string_k_nucleotide", func() {
+		kNucleotidePerf(50000, 8, 5)
 	})
 }
