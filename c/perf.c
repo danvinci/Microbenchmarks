@@ -229,6 +229,91 @@ void printfd(int n) {
     fclose(f);
 }
 
+// N-body simulation
+
+typedef struct {
+    double *x, *y, *z, *vx, *vy, *vz, *m;
+    int n;
+} nbody_system;
+
+static unsigned int nbody_rng_state = 42;
+
+double nbody_rand(void) {
+    nbody_rng_state = nbody_rng_state * 1664525 + 1013904223;
+    return (double)(nbody_rng_state & 0x7FFFFFFF) / (double)0x7FFFFFFF;
+}
+
+void nbody_init(nbody_system *sys, int n) {
+    sys->n = n;
+    sys->x  = (double *)malloc(n * sizeof(double));
+    sys->y  = (double *)malloc(n * sizeof(double));
+    sys->z  = (double *)malloc(n * sizeof(double));
+    sys->vx = (double *)malloc(n * sizeof(double));
+    sys->vy = (double *)malloc(n * sizeof(double));
+    sys->vz = (double *)malloc(n * sizeof(double));
+    sys->m  = (double *)malloc(n * sizeof(double));
+    nbody_rng_state = 42;
+    double inv_n = 1.0 / n;
+    for (int i = 0; i < n; i++) {
+        sys->x[i]  = nbody_rand() * 2.0 - 1.0;
+        sys->y[i]  = nbody_rand() * 2.0 - 1.0;
+        sys->z[i]  = nbody_rand() * 2.0 - 1.0;
+        sys->vx[i] = (nbody_rand() - 0.5) * 0.1;
+        sys->vy[i] = (nbody_rand() - 0.5) * 0.1;
+        sys->vz[i] = (nbody_rand() - 0.5) * 0.1;
+        sys->m[i]  = nbody_rand() * inv_n;
+    }
+}
+
+void nbody_free(nbody_system *sys) {
+    free(sys->x); free(sys->y); free(sys->z);
+    free(sys->vx); free(sys->vy); free(sys->vz);
+    free(sys->m);
+}
+
+void nbody_step(nbody_system *sys, double dt) {
+    const double G = 1.0;
+    const double eps2 = 1e-4;
+    int n = sys->n;
+    double *restrict x = sys->x, *restrict y = sys->y, *restrict z = sys->z;
+    double *restrict vx = sys->vx, *restrict vy = sys->vy, *restrict vz = sys->vz;
+    double *restrict m = sys->m;
+
+    // Compute forces and update velocities
+    for (int i = 0; i < n; i++) {
+        double fx = 0.0, fy = 0.0, fz = 0.0;
+        for (int j = 0; j < n; j++) {
+            double dx = x[j] - x[i];
+            double dy = y[j] - y[i];
+            double dz = z[j] - z[i];
+            double dist_sq = dx*dx + dy*dy + dz*dz + eps2;
+            double inv_dist = 1.0 / sqrt(dist_sq);
+            double inv_dist3 = inv_dist * inv_dist * inv_dist;
+            fx += dx * inv_dist3 * m[j];
+            fy += dy * inv_dist3 * m[j];
+            fz += dz * inv_dist3 * m[j];
+        }
+        vx[i] += dt * G * fx;
+        vy[i] += dt * G * fy;
+        vz[i] += dt * G * fz;
+    }
+    // Update positions
+    for (int i = 0; i < n; i++) {
+        x[i] += dt * vx[i];
+        y[i] += dt * vy[i];
+        z[i] += dt * vz[i];
+    }
+}
+
+double nbody_checksum(nbody_system *sys) {
+    double s = 0.0;
+    int n = sys->n;
+    for (int i = 0; i < n; i++) {
+        s += sys->x[i] + sys->y[i] + sys->z[i];
+    }
+    return s;
+}
+
 void print_perf(const char *name, double t) {
     printf("c,%s,%.6f\n", name, t*1000);
 }
@@ -375,6 +460,33 @@ int main() {
         if (t < tmin) tmin = t;
     }
     print_perf("print_to_file", tmin);
+
+    // N-body simulation
+    nbody_system nb_sys;
+    double nb_dt = 0.01;
+    int nb_steps = 10;
+    nbody_init(&nb_sys, 1000);
+    for (int s = 0; s < nb_steps; s++) nbody_step(&nb_sys, nb_dt);
+    double nb_ref = nbody_checksum(&nb_sys);
+    nbody_free(&nb_sys);
+    tmin = INFINITY;
+    double nb_cs = 0.0;
+    for (int i = 0; i < NITER; ++i) {
+        nbody_init(&nb_sys, 1000);
+        t = clock_now();
+        for (int s = 0; s < nb_steps; s++) {
+            nbody_step(&nb_sys, nb_dt);
+        }
+        t = clock_now() - t;
+        double cs = nbody_checksum(&nb_sys);
+        assert(fabs(cs - nb_ref) < 1e-6);
+        nb_cs += cs;
+        nbody_free(&nb_sys);
+        if (t < tmin) tmin = t;
+    }
+    static volatile double nb_sink = 0.0;
+    nb_sink += nb_cs;
+    print_perf("simulation_nbody", tmin);
 
     return 0;
 }
