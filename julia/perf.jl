@@ -1,7 +1,7 @@
 # This file was formerly a part of Julia. License is MIT: https://julialang.org/license
 
 using LinearAlgebra: tr
-using Printf: @printf
+using Printf: @printf, @sprintf
 using Random: seed!, rand, randn
 using Statistics: std, mean
 using Test: @test
@@ -132,6 +132,38 @@ end
 ## largish random number gen & matmul ##
 
 @timeit rand(1000, 1000) * rand(1000, 1000) "matrix_multiply"
+
+## groupby aggregation ##
+
+mutable struct GroupAcc
+    count::Int
+    sum::Float64
+    sum_sq::Float64
+end
+
+function groupby_generate(n_rows::Int, n_groups::Int)
+    keys = [@sprintf("g%06d", rand(0:n_groups-1)) for _ = 1:n_rows]
+    vals = rand(n_rows)
+    return keys, vals
+end
+
+function groupby_aggregate(keys, vals)
+    ht = Dict{String,GroupAcc}()
+    for (k, v) in zip(keys, vals)
+        acc = get!(ht, k) do; GroupAcc(0, 0.0, 0.0) end
+        acc.count += 1
+        acc.sum += v
+        acc.sum_sq += v * v
+    end
+    cs = 0.0
+    for acc in values(ht); cs += acc.sum / acc.count end
+    return cs
+end
+
+groupby_keys, groupby_vals = groupby_generate(50000, 100)
+groupby_ref = groupby_aggregate(groupby_keys, groupby_vals)
+@test groupby_aggregate(groupby_keys, groupby_vals) == groupby_ref
+@timeit groupby_aggregate(groupby_keys, groupby_vals) "data_groupby_aggregate"
 
 ## printfd ##
 
