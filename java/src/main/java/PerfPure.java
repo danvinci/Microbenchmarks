@@ -122,6 +122,19 @@ public class PerfPure {
         }
         print_perf("matrix_multiply", tmin);
 
+        // reverse-complement
+        long rcRef = revcompPerf(50000, 20);
+        assert(revcompPerf(50000, 20) == rcRef);
+        long rcSum = 0;
+        tmin = Long.MAX_VALUE;
+        for (int i = 0; i < NITER; ++i) {
+            t = System.nanoTime();
+            rcSum += revcompPerf(50000, 20);
+            t = System.nanoTime() - t;
+            if (t < tmin) tmin = t;
+        }
+        print_perf("string_reverse_complement", tmin);
+
         // printfd
         tmin = Long.MAX_VALUE;
         for (int i=0; i<NITER; ++i) {
@@ -142,6 +155,16 @@ public class PerfPure {
             e.printStackTrace();
         }
     }
+
+    // reverse-complement
+
+    private static final byte[] RC_ALPHABET = {'A', 'C', 'G', 'T'};
+    private static final byte[] RC_COMPLEMENT = new byte[256];
+    static { RC_COMPLEMENT['A']='T'; RC_COMPLEMENT['C']='G'; RC_COMPLEMENT['G']='C'; RC_COMPLEMENT['T']='A'; }
+
+    private static byte[] genRcDna(int n) { Random r = new Random(42); byte[] b = new byte[n]; for (int i=0; i<n; i++) b[i] = RC_ALPHABET[r.nextInt(4)]; return b; }
+    private static void reverseComplement(byte[] buf) { int i=0, j=buf.length-1; while (i<=j) { byte ci=RC_COMPLEMENT[buf[i]], cj=RC_COMPLEMENT[buf[j]]; buf[i]=cj; buf[j]=ci; i++; j--; } }
+    private static long revcompPerf(int n, int iters) { byte[] seq = genRcDna(n); byte[] buf = seq.clone(); for (int j=0; j<iters; j++) reverseComplement(buf); long s=0; for (byte b: buf) s+=b; return s; }
 
     private double randmatmul(int i) {
         SimpleMatrix a = SimpleMatrix.random_DDRM(i, i,  -1d, +1d, rand);
