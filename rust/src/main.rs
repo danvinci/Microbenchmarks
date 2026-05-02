@@ -39,6 +39,40 @@ fn fib(n: i32) -> i32 {
     }
 }
 
+// reverse-complement
+
+static RC_COMPLEMENT: [u8; 256] = {
+    let mut t = [0u8; 256];
+    t[b'A' as usize] = b'T';
+    t[b'C' as usize] = b'G';
+    t[b'G' as usize] = b'C';
+    t[b'T' as usize] = b'A';
+    t
+};
+
+fn gen_rc_dna(n: usize) -> Vec<u8> {
+    let mut rng = gen_rng(42u64);
+    let alpha = b"ACGT";
+    (0..n).map(|_| alpha[rng.gen_range(0usize..4)]).collect()
+}
+fn reverse_complement(buf: &mut [u8]) {
+    let (mut i, mut j) = (0, buf.len().wrapping_sub(1));
+    while i <= j {
+        let ci = RC_COMPLEMENT[buf[i] as usize];
+        let cj = RC_COMPLEMENT[buf[j] as usize];
+        buf[i] = cj; buf[j] = ci;
+        i += 1;
+        if j == 0 { break; }
+        j -= 1;
+    }
+}
+fn revcomp_perf(seq_len: usize, iters: usize) -> u64 {
+    let seq = gen_rc_dna(seq_len);
+    let mut buf = seq.clone();
+    for _ in 0..iters { reverse_complement(&mut buf); }
+    buf.iter().map(|&b| b as u64).sum()
+}
+
 fn mandel(z: Complex64) -> u32 {
     use std::iter;
 
@@ -300,4 +334,15 @@ fn main() {
         printfd(100000);
     });
     print_perf("print_to_file", to_float(tmin));
+
+    // reverse-complement
+    let rc_ref = revcomp_perf(50000, 20);
+    assert_eq!(revcomp_perf(50000, 20), rc_ref);
+    let mut rc_sum: u64 = 0;
+    let tmin = measure_best(NITER, || {
+        let s = revcomp_perf(50000, 20);
+        rc_sum = rc_sum.wrapping_add(s);
+    });
+    black_box(rc_sum);
+    print_perf("string_reverse_complement", to_float(tmin));
 }
