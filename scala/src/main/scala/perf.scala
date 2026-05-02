@@ -277,5 +277,52 @@ object Perf {
       tmin = math.min(tmin, System.nanoTime() - t)
     }
     printPerf("print_to_file", tmin)
+
+    // k-nucleotide
+    val kmerSeqLen = 50000
+    val kmerK = 8
+    val kmerIters = 5
+    val kmerExpected = kmerIters * (kmerSeqLen - kmerK + 1)
+    assert(kNucleotidePerf(kmerSeqLen, kmerK, 1) == kmerSeqLen - kmerK + 1)
+    var kmerSum = 0
+    tmin = Long.MaxValue
+    for (_ <- 0 until NITER) {
+      t = System.nanoTime()
+      val s = kNucleotidePerf(kmerSeqLen, kmerK, kmerIters)
+      kmerSum += s
+      tmin = math.min(tmin, System.nanoTime() - t)
+    }
+    assert(kmerSum == kmerExpected * NITER)
+    printPerf("string_k_nucleotide", tmin)
+  }
+
+  // ---------------------------------------------------------------------------
+  // k-nucleotide counting
+  // ---------------------------------------------------------------------------
+
+  val kmerAlphabet = Array('A', 'C', 'G', 'T')
+
+  def generateDna(n: Int): String = {
+    val r = new scala.util.Random(42)
+    val buf = new Array[Byte](n)
+    for (i <- 0 until n) buf(i) = kmerAlphabet(r.nextInt(4)).toByte
+    new String(buf)
+  }
+
+  def countKmers(seq: String, k: Int): Int = {
+    val ht = scala.collection.mutable.Map[String, Int]()
+    val limit = seq.length - k + 1
+    for (i <- 0 until limit) {
+      val kmer = seq.substring(i, i + k)
+      ht(kmer) = ht.getOrElse(kmer, 0) + 1
+    }
+    ht.values.sum
+  }
+
+  def kNucleotidePerf(seqLen: Int, k: Int, iters: Int): Int = {
+    val seq = generateDna(seqLen)
+    var s = 0
+    for (_ <- 0 until iters) s += countKmers(seq, k)
+    s
   }
 }
