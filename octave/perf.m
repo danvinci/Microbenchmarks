@@ -44,7 +44,12 @@ function perf()
 	timeit('matrix_multiply', @randmatmul, 1000);
 
 	printfd(1)
-	timeit('print_to_file', @printfd, 100000)
+    timeit('print_to_file', @printfd, 100000)
+
+    bfs_adj = bfs_create(5000, 20000);
+    bfs_ref = bfs_search(bfs_adj, 1);
+    assert(bfs_search(bfs_adj, 1) == bfs_ref);
+    timeit('algorithm_graph_bfs', @bfs_search, bfs_adj, 1)
 
 end
 
@@ -231,4 +236,21 @@ function printfd(n)
         fprintf(f, '%d %d\n', i, i + 1);
     end
     fclose(f);
+end
+
+%% graph BFS %%
+
+function adj = bfs_create(V, E)
+    rand("state", 42);
+    adj = cell(1, V);
+    for i = 1:E; u = randi(V); v = randi(V); adj{u} = [adj{u}, v]; adj{v} = [adj{v}, u]; end
+end
+
+function cnt = bfs_search(adj, start)
+    V = length(adj); vis = false(1, V); q = []; q(end+1) = start; vis(start) = true; cnt = 1;
+    while ~isempty(q); u = q(1); q(1) = [];
+        for j = 1:length(adj{u}); v = adj{u}(j);
+            if ~vis(v); vis(v) = true; q(end+1) = v; cnt = cnt + 1; end
+        end
+    end
 end
