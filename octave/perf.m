@@ -44,7 +44,12 @@ function perf()
 	timeit('matrix_multiply', @randmatmul, 1000);
 
 	printfd(1)
-	timeit('print_to_file', @printfd, 100000)
+    timeit('print_to_file', @printfd, 100000)
+
+    assert(k_nucleotide_perf(50000, 8, 1) == 50000 - 8 + 1)
+    knuc_ref = k_nucleotide_perf(50000, 8, 5);
+    assert(k_nucleotide_perf(50000, 8, 5) == knuc_ref);
+    timeit('string_k_nucleotide', @k_nucleotide_perf, 50000, 8, 5)
 
 end
 
@@ -231,4 +236,37 @@ function printfd(n)
         fprintf(f, '%d %d\n', i, i + 1);
     end
     fclose(f);
+end
+
+%% k-nucleotide counting %%
+
+function seq = generate_dna(n)
+    rand("state", 42);
+    alphabet = 'ACGT';
+    seq = alphabet(randi(4, 1, n));
+end
+
+function total = count_kmers(seq, k)
+    counts = zeros(1, 65536);
+    limit = length(seq) - k + 1;
+    for i = 1:limit
+        code = 0;
+        for v = 1:k
+            switch seq(i+v-1)
+                case 'C'; code = code + bitshift(1, 2*(v-1));
+                case 'G'; code = code + bitshift(2, 2*(v-1));
+                case 'T'; code = code + bitshift(3, 2*(v-1));
+            end
+        end
+        counts(code + 1) = counts(code + 1) + 1;
+    end
+    total = sum(counts);
+end
+
+function s = k_nucleotide_perf(seq_len, k, iters)
+    seq = generate_dna(seq_len);
+    s = 0;
+    for j = 1:iters
+        s = s + count_kmers(seq, k);
+    end
 end
