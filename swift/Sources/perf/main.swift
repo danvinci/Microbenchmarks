@@ -35,6 +35,47 @@ func blackHole<T>(_ x: T) {
 }
 
 // ---------------------------------------------------------------------------
+// Reverse-complement
+// ---------------------------------------------------------------------------
+
+var rcRngState: UInt32 = 42
+let rcAlphabet: [UInt8] = [UInt8(ascii: "A"), UInt8(ascii: "C"), UInt8(ascii: "G"), UInt8(ascii: "T")]
+let rcComplement: [UInt8] = {
+    var t = [UInt8](repeating: 0, count: 256)
+    t[Int(UInt8(ascii: "A"))] = UInt8(ascii: "T")
+    t[Int(UInt8(ascii: "C"))] = UInt8(ascii: "G")
+    t[Int(UInt8(ascii: "G"))] = UInt8(ascii: "C")
+    t[Int(UInt8(ascii: "T"))] = UInt8(ascii: "A")
+    return t
+}()
+
+func rcNextBase() -> UInt8 {
+    rcRngState = rcRngState &* 1664525 &+ 1013904223
+    return rcAlphabet[Int((rcRngState >> 16) & 3)]
+}
+func genRcDna(_ n: Int) -> [UInt8] {
+    rcRngState = 42
+    var buf = [UInt8](repeating: 0, count: n)
+    for i in 0..<n { buf[i] = rcNextBase() }
+    return buf
+}
+func reverseComplement(_ buf: inout [UInt8]) {
+    var i = 0; var j = buf.count - 1
+    while i <= j {
+        let ci = rcComplement[Int(buf[i])]
+        let cj = rcComplement[Int(buf[j])]
+        buf[i] = cj; buf[j] = ci
+        i += 1; j -= 1
+    }
+}
+func revcompPerf(seqLen: Int, iters: Int) -> Int {
+    let seq = genRcDna(seqLen)
+    var buf = seq
+    for _ in 0..<iters { reverseComplement(&buf) }
+    return buf.reduce(0) { Int($0) + Int($1) }
+}
+
+// ---------------------------------------------------------------------------
 // Fibonacci
 // ---------------------------------------------------------------------------
 
@@ -414,3 +455,17 @@ for _ in 0..<NITER {
     if elapsed < tmin { tmin = elapsed }
 }
 printPerf("print_to_file", tmin)
+
+// reverse-complement
+let rcRef = revcompPerf(seqLen: 50000, iters: 20)
+precondition(revcompPerf(seqLen: 50000, iters: 20) == rcRef)
+var rcSum = 0
+tmin = Double.infinity
+for _ in 0..<NITER {
+    let t = clockNow()
+    rcSum += revcompPerf(seqLen: 50000, iters: 20)
+    let elapsed = clockNow() - t
+    if elapsed < tmin { tmin = elapsed }
+}
+blackHole(rcSum)
+printPerf("string_reverse_complement", tmin)
