@@ -277,5 +277,16 @@ object Perf {
       tmin = math.min(tmin, System.nanoTime() - t)
     }
     printPerf("print_to_file", tmin)
+
+    // bfs
+    val bfsAdj = bfsCreate(5000, 20000); val bfsRef = bfsSearch(bfsAdj, 0); assert(bfsSearch(bfsAdj, 0) == bfsRef)
+    var bfsCnt = 0; tmin = Long.MaxValue
+    for (_ <- 0 until NITER) { t = System.nanoTime(); bfsCnt += bfsSearch(bfsAdj, 0); tmin = math.min(tmin, System.nanoTime() - t) }
+    assert(bfsCnt == bfsRef * NITER)
+    sink = bfsCnt; printPerf("algorithm_graph_bfs", tmin)
   }
+
+  // graph BFS
+  def bfsCreate(V: Int, E: Int): Array[scala.collection.mutable.ArrayBuffer[Int]] = { val r = new scala.util.Random(42); val adj = Array.fill(V)(scala.collection.mutable.ArrayBuffer[Int]()); for (_ <- 0 until E) { val u=r.nextInt(V); val v=r.nextInt(V); adj(u)+=v; adj(v)+=u }; adj }
+  def bfsSearch(adj: Array[scala.collection.mutable.ArrayBuffer[Int]], start: Int): Int = { val V=adj.length; val vis=new Array[Boolean](V); val q=scala.collection.mutable.Queue[Int](); q+=start; vis(start)=true; var cnt=1; while(q.nonEmpty){val u=q.dequeue(); for(v<-adj(u)){if(!vis(v)){vis(v)=true;q+=v;cnt+=1}}};cnt }
 }
