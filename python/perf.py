@@ -1,5 +1,5 @@
 from numpy import *
-from numpy.random import rand, randn
+from numpy.random import rand, randn, seed, randint
 from numpy.linalg import matrix_power
 import sys
 import time
@@ -7,6 +7,30 @@ import random
 
 if sys.version_info < (3,):
     range = xrange
+
+## k-nucleotide counting ##
+
+def generate_dna(n):
+    seed(42)
+    return bytes(b'ACGT'[i] for i in randint(0, 4, n))
+
+def count_kmers(seq, k):
+    ht = {}
+    limit = len(seq) - k + 1
+    for i in range(limit):
+        kmer = seq[i:i+k]
+        ht[kmer] = ht.get(kmer, 0) + 1
+    total = 0
+    for v in ht.values():
+        total += v
+    return total
+
+def k_nucleotide_perf(seq_len, k, iters):
+    seq = generate_dna(seq_len)
+    s = 0
+    for j in range(iters):
+        s += count_kmers(seq, k)
+    return s
 
 ## fibonacci ##
 
@@ -190,6 +214,17 @@ if __name__=="__main__":
         t = time.time()-t
         if t < tmin: tmin = t
     print_perf ("matrix_multiply", tmin)
+
+    assert k_nucleotide_perf(50000, 8, 1) == 50000 - 8 + 1
+    knuc_ref = k_nucleotide_perf(50000, 8, 5)
+    assert k_nucleotide_perf(50000, 8, 5) == knuc_ref
+    tmin = float('inf')
+    for i in range(mintrials):
+        t = time.time()
+        k_nucleotide_perf(50000, 8, 5)
+        t = time.time()-t
+        if t < tmin: tmin = t
+    print_perf ("string_k_nucleotide", tmin)
 
     tmin = float('inf')
     for i in range(mintrials):
