@@ -122,6 +122,24 @@ public class PerfPure {
         }
         print_perf("matrix_multiply", tmin);
 
+        // k-nucleotide
+        int kmerSeqLen = 50000;
+        int kmerK = 8;
+        int kmerIters = 5;
+        int kmerExpected = kmerIters * (kmerSeqLen - kmerK + 1);
+        assert(kNucleotidePerf(kmerSeqLen, kmerK, 1) == kmerSeqLen - kmerK + 1);
+        int kmerSum = 0;
+        tmin = Long.MAX_VALUE;
+        for (int i = 0; i < NITER; ++i) {
+            t = System.nanoTime();
+            int s = kNucleotidePerf(kmerSeqLen, kmerK, kmerIters);
+            t = System.nanoTime() - t;
+            kmerSum += s;
+            if (t < tmin) tmin = t;
+        }
+        assert(kmerSum == kmerExpected * NITER);
+        print_perf("string_k_nucleotide", tmin);
+
         // printfd
         tmin = Long.MAX_VALUE;
         for (int i=0; i<NITER; ++i) {
@@ -141,6 +159,36 @@ public class PerfPure {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    // k-nucleotide counting
+
+    private static final byte[] KMER_ALPHABET = {'A', 'C', 'G', 'T'};
+
+    private static String generateDna(int n) {
+        Random r = new Random(42);
+        byte[] buf = new byte[n];
+        for (int i = 0; i < n; i++) buf[i] = KMER_ALPHABET[r.nextInt(4)];
+        return new String(buf);
+    }
+
+    private static int countKmers(String seq, int k) {
+        java.util.HashMap<String, Integer> ht = new java.util.HashMap<>();
+        int limit = seq.length() - k + 1;
+        for (int i = 0; i < limit; i++) {
+            String kmer = seq.substring(i, i + k);
+            ht.put(kmer, ht.getOrDefault(kmer, 0) + 1);
+        }
+        int total = 0;
+        for (int v : ht.values()) total += v;
+        return total;
+    }
+
+    private static int kNucleotidePerf(int seqLen, int k, int iters) {
+        String seq = generateDna(seqLen);
+        int s = 0;
+        for (int j = 0; j < iters; j++) s += countKmers(seq, k);
+        return s;
     }
 
     private double randmatmul(int i) {
