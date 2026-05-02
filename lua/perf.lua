@@ -217,3 +217,11 @@ if jit.os ~= 'Windows' then
 
     timeit(function() return printfd(100000) end, 'print_to_file')
 end
+
+-- groupby aggregation
+local function gb_generate(nr,ng) math.randomseed(42); local k,v={},{}; for i=1,nr do k[i]=string.format('g%06d', math.random(0, ng-1)); v[i]=math.random() end; return k,v end
+local function gb_aggregate(k,v) local ht={}; for i=1,#k do local key=k[i]; local a=ht[key]; if a then a[1]=a[1]+1;a[2]=a[2]+v[i];a[3]=a[3]+v[i]*v[i] else ht[key]={1,v[i],v[i]*v[i]} end end; local cs=0; for _,a in pairs(ht) do cs=cs+a[2]/a[1] end; return cs end
+local gb_keys, gb_vals = gb_generate(50000, 100)
+local gb_ref = gb_aggregate(gb_keys, gb_vals)
+timeit(function() return gb_aggregate(gb_keys, gb_vals) end, 'data_groupby_aggregate',
+    function(c) assert(math.abs(c - gb_ref) < 1e-6) end)
