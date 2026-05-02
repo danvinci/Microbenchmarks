@@ -133,6 +133,68 @@ end
 
 @timeit rand(1000, 1000) * rand(1000, 1000) "matrix_multiply"
 
+## N-body simulation ##
+
+mutable struct NBody
+    x::Vector{Float64}
+    y::Vector{Float64}
+    z::Vector{Float64}
+    vx::Vector{Float64}
+    vy::Vector{Float64}
+    vz::Vector{Float64}
+    m::Vector{Float64}
+end
+
+function nbody_init(n::Int)
+    seed!(42)
+    x  = 2.0 .* rand(n) .- 1.0
+    y  = 2.0 .* rand(n) .- 1.0
+    z  = 2.0 .* rand(n) .- 1.0
+    vx = (rand(n) .- 0.5) .* 0.1
+    vy = (rand(n) .- 0.5) .* 0.1
+    vz = (rand(n) .- 0.5) .* 0.1
+    m  = rand(n) ./ n
+    return NBody(x, y, z, vx, vy, vz, m)
+end
+
+function nbody_step!(sys::NBody, dt::Float64)
+    G = 1.0; eps2 = 1e-4; n = length(sys.x)
+    x = sys.x; y = sys.y; z = sys.z
+    vx = sys.vx; vy = sys.vy; vz = sys.vz; m = sys.m
+    @inbounds for i = 1:n
+        fx = 0.0; fy = 0.0; fz = 0.0
+        for j = 1:n
+            dx = x[j] - x[i]; dy = y[j] - y[i]; dz = z[j] - z[i]
+            dist_sq = dx*dx + dy*dy + dz*dz + eps2
+            inv_dist = 1.0 / sqrt(dist_sq)
+            inv_dist3 = inv_dist * inv_dist * inv_dist
+            fx += dx * inv_dist3 * m[j]
+            fy += dy * inv_dist3 * m[j]
+            fz += dz * inv_dist3 * m[j]
+        end
+        vx[i] += dt * G * fx
+        vy[i] += dt * G * fy
+        vz[i] += dt * G * fz
+    end
+    @inbounds for i = 1:n
+        x[i] += dt * vx[i]
+        y[i] += dt * vy[i]
+        z[i] += dt * vz[i]
+    end
+end
+
+function nbody_perf(n::Int, steps::Int, dt::Float64)
+    sys = nbody_init(n)
+    for s = 1:steps
+        nbody_step!(sys, dt)
+    end
+    return sum(sys.x) + sum(sys.y) + sum(sys.z)
+end
+
+nbody_ref = nbody_perf(1000, 10, 0.01)
+@test abs(nbody_perf(1000, 10, 0.01) - nbody_ref) < 1e-6
+@timeit nbody_perf(1000, 10, 0.01) "simulation_nbody"
+
 ## printfd ##
 
 if Sys.isunix()
