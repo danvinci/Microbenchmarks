@@ -100,7 +100,7 @@ jobs:
       - name: "Set up Go"
         uses: actions/setup-go@v6
         with:
-          go-version: '1.24'
+          go-version: '1.26'
       - name: "Set up OpenBLAS"
         run: sudo apt-get install -y libopenblas-dev
       - name: "Download Go modules"
@@ -130,7 +130,7 @@ jobs:
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: '24'
+          java-version: '25'
           cache: 'maven'
       - name: "Download dependencies and compile"
         run: cd java && mvn -q dependency:resolve compile
@@ -158,7 +158,7 @@ jobs:
       - name: "Set up JavaScript"
         uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version: '25'
       - name: "Run benchmark"
         run: make benchmarks/javascript.csv
       - name: "Capture version"
@@ -259,7 +259,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: "Set up Numba"
-        run: pip install numpy==2.3 numba
+        run: pip install numpy==2.4 numba
       - name: "Run benchmark"
         run: make benchmarks/numba.csv
       - name: "Capture version"
@@ -284,9 +284,9 @@ jobs:
       - name: "Set up Python"
         uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: '3.14'
       - name: "Set up NumPy"
-        run: pip install numpy==2.3
+        run: pip install numpy==2.4
       - name: "Run benchmark"
         run: make benchmarks/python.csv
       - name: "Capture version"
@@ -395,7 +395,7 @@ jobs:
       - name: "Set up Swift"
         uses: swift-actions/setup-swift@v2
         with:
-          swift-version: '6.1'
+          swift-version: '6.3'
       - name: "Set up OpenBLAS"
         run: sudo apt-get install -y libopenblas-dev
       - name: "Build"
