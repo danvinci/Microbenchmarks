@@ -215,6 +215,11 @@ func pisum() float64 {
 
 const NITER = 5
 
+// graph BFS
+
+func bfsCreate(V, E int) [][]int { r := rand.New(rand.NewSource(42)); adj := make([][]int, V); for i:=0;i<E;i++{u:=r.Intn(V);v:=r.Intn(V);adj[u]=append(adj[u],v);adj[v]=append(adj[v],u)}; return adj }
+func bfsSearch(adj [][]int, start int) int { V:=len(adj); vis:=make([]bool,V); q:=[]int{start}; vis[start]=true; cnt:=1; for len(q)>0{u:=q[0];q=q[1:];for _,v:=range adj[u]{if!vis[v]{vis[v]=true;q=append(q,v);cnt++}}}; return cnt }
+
 func print_perf(name string, t float64) {
 	fmt.Printf("go,%v,%v\n", name, t*1000)
 }
@@ -293,5 +298,12 @@ func main() {
 
 	timeit("print_to_file", func() {
 		printfd(100000)
+	})
+
+	bfsAdj := bfsCreate(5000, 20000)
+	bfsRef := bfsSearch(bfsAdj, 0)
+	if bfsSearch(bfsAdj, 0) != bfsRef { panic("bfsSearch not deterministic") }
+	timeit("algorithm_graph_bfs", func() {
+		bfsSearch(bfsAdj, 0)
 	})
 }
