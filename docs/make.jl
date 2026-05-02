@@ -30,6 +30,7 @@ const BENCHMARK_ORDER = [
     "matrix_statistics",
     "matrix_multiply",
     "userfunc_mandelbrot",
+    "algorithm_graph_bfs",
 ]
 
 # Color palette — one color per benchmark (matching julialang.org/benchmarks style)
@@ -42,6 +43,7 @@ const COLORS = [
     "rgb(230, 130, 180)",
     "rgb(220, 200, 50)",
     "rgb(80, 180, 80)",
+    "rgb(50, 180, 120)",
 ]
 
 """
