@@ -178,10 +178,16 @@ end module
 
 module bench
 use utils, only: trace, randn, std, mean, stop_error
-use types, only: dp
+use types, only: dp, i64
 implicit none
 private
-public fib, parse_int, printfd, quicksort, mandelperf, pisum, randmatstat, randmatmul
+public fib, parse_int, printfd, quicksort, mandelperf, pisum, randmatstat, randmatmul, &
+    gb_generate, gb_aggregate, gb_keys, gb_vals
+
+integer, parameter :: GB_HT_SIZE = 1024
+integer, parameter :: GB_KEY_LEN = 8
+real(dp), allocatable :: gb_vals(:)
+character(len=GB_KEY_LEN), allocatable :: gb_keys(:)
 
 contains
 
@@ -192,6 +198,64 @@ if (n < 2) then
 else
     r = fib(n-1) + fib(n-2)
 end if
+end function
+
+! groupby aggregation
+
+subroutine gb_seed_fixed()
+    integer :: n; integer, allocatable :: seed(:)
+    call random_seed(size=n); allocate(seed(n)); seed = 42
+    call random_seed(put=seed); deallocate(seed)
+end subroutine
+
+integer function gb_hash(key) result(h)
+    character(len=*), intent(in) :: key
+    integer :: i
+    h = 0
+    do i = 1, len_trim(key)
+        h = ieor(h * 31, iachar(key(i:i)))
+    end do
+    h = iand(h, GB_HT_SIZE - 1)
+end function
+
+subroutine gb_generate(nr, ng)
+    integer, intent(in) :: nr, ng
+    integer :: i, gid
+    real(dp) :: x
+    allocate(gb_keys(nr), gb_vals(nr))
+    call gb_seed_fixed()
+    do i = 1, nr
+        call random_number(x); gid = int(x * ng)
+        write(gb_keys(i), '("g",I6.6)') gid
+        call random_number(x); gb_vals(i) = x
+    end do
+end subroutine
+
+real(dp) function gb_aggregate() result(cs)
+    integer :: i, n, h, probe
+    integer :: ht_count(0:GB_HT_SIZE-1)
+    character(len=GB_KEY_LEN) :: ht_key(0:GB_HT_SIZE-1)
+    real(dp) :: ht_sum(0:GB_HT_SIZE-1), ht_sum_sq(0:GB_HT_SIZE-1)
+    ht_count = 0; ht_key = ""; ht_sum = 0; ht_sum_sq = 0
+    n = size(gb_keys)
+    do i = 1, n
+        h = gb_hash(gb_keys(i))
+        do probe = 0, GB_HT_SIZE - 1
+            if (ht_count(h) == 0) then
+                ht_key(h) = gb_keys(i); exit
+            else if (ht_key(h) == gb_keys(i)) then
+                exit
+            end if
+            h = iand(h + 1, GB_HT_SIZE - 1)
+        end do
+        ht_count(h) = ht_count(h) + 1
+        ht_sum(h) = ht_sum(h) + gb_vals(i)
+        ht_sum_sq(h) = ht_sum_sq(h) + gb_vals(i) * gb_vals(i)
+    end do
+    cs = 0
+    do i = 0, GB_HT_SIZE - 1
+        if (ht_count(i) > 0) cs = cs + ht_sum(i) / ht_count(i)
+    end do
 end function
 
 integer function parse_int(s, base) result(n)
@@ -358,7 +422,7 @@ program perf
 use types, only: dp, i64
 use utils, only: assert, init_random_seed, sysclock2ms, hex_string
 use bench, only: fib, parse_int, printfd, quicksort, mandelperf, pisum, randmatstat, &
-    randmatmul
+    randmatmul, gb_generate, gb_aggregate, gb_keys, gb_vals
 implicit none
 
 integer, parameter :: NRUNS = 1000
@@ -368,6 +432,7 @@ integer(i64) :: t1, t2, tmin
 real(dp) :: pi, s1, s2
 real(dp), allocatable :: C(:, :), d(:)
 character(len=11) :: s
+real(dp) :: gb_cs, gb_ref
 
 call init_random_seed()
 
@@ -465,5 +530,21 @@ do i = 1, 5
     if (t2-t1 < tmin) tmin = t2-t1
 end do
 print "('fortran,matrix_multiply,',f0.6)", sysclock2ms(tmin)
+
+! groupby
+call gb_generate(50000, 100)
+gb_ref = gb_aggregate()
+call assert(abs(gb_aggregate() - gb_ref) < 1e-6_dp)
+gb_cs = 0
+tmin = huge(0_i64)
+do i = 1, 5
+    call system_clock(t1)
+    gb_cs = gb_cs + gb_aggregate()
+    call system_clock(t2)
+    if (t2-t1 < tmin) tmin = t2-t1
+end do
+call assert(abs(gb_cs - gb_ref * 5) < 1e-3_dp)
+deallocate(gb_keys, gb_vals)
+print "('fortran,data_groupby_aggregate,',f0.6)", sysclock2ms(tmin)
 
 end program
