@@ -453,4 +453,15 @@ const fs = require('fs'); // for print to file benchmark
     t = (new Date()).getTime()-t;
     if (t < tmin) { tmin=t; }
     console.log("javascript,matrix_multiply," + tmin);
+
+    // groupby aggregation
+    function gbPad(n){var s='000000'+n; return s.substring(s.length-6)}
+    function gbGenerate(nr,ng){var k=[],v=[],i; for(i=0;i<nr;i++){k.push('g'+gbPad(Math.floor(Math.random()*ng)));v.push(Math.random())} return[k,v]}
+    function gbAggregate(keys,vals){var ht={},i,k,cs=0; for(i=0;i<keys.length;i++){k=keys[i];if(ht[k]){ht[k][0]++;ht[k][1]+=vals[i];ht[k][2]+=vals[i]*vals[i]}else{ht[k]=[1,vals[i],vals[i]*vals[i]]}} for(k in ht){if(ht.hasOwnProperty(k)){var a=ht[k];cs+=a[1]/a[0]}} return cs}
+    var gbData=gbGenerate(50000,100);
+    var gbRef=gbAggregate(gbData[0],gbData[1]);
+    assert(gbAggregate(gbData[0],gbData[1])===gbRef);
+    tmin=Number.POSITIVE_INFINITY;
+    for(var trial=0;trial<5;trial++){t=(new Date()).getTime();for(var k=0;k<10;k++)gbAggregate(gbData[0],gbData[1]);t=(new Date()).getTime()-t;if(t<tmin)tmin=t}
+    console.log("javascript,data_groupby_aggregate,"+tmin/10);
 }());
