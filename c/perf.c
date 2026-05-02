@@ -229,6 +229,80 @@ void printfd(int n) {
     fclose(f);
 }
 
+// groupby aggregation
+
+#define GB_HT_SIZE 1024
+#define GB_KEY_LEN 8
+
+typedef struct {
+    char key[GB_KEY_LEN];
+    int count;
+    double sum, sum_sq;
+} gb_entry;
+
+typedef struct {
+    gb_entry *entries;
+    int n_rows;
+    int n_groups;
+    char **keys;
+    double *values;
+} gb_data;
+
+static unsigned int gb_rng_state = 42;
+
+double gb_rand(void) {
+    gb_rng_state = gb_rng_state * 1664525 + 1013904223;
+    return (double)(gb_rng_state & 0x7FFFFFFF) / (double)0x7FFFFFFF;
+}
+
+void gb_make_key(int group_id, char *key) {
+    snprintf(key, GB_KEY_LEN, "g%06d", group_id);
+}
+
+void gb_generate_data(gb_data *d, int n_rows, int n_groups) {
+    gb_rng_state = 42;
+    d->n_rows = n_rows;
+    d->n_groups = n_groups;
+    d->keys = (char **)malloc(n_rows * sizeof(char *));
+    d->values = (double *)malloc(n_rows * sizeof(double));
+    for (int i = 0; i < n_rows; i++) {
+        int gid = (int)(gb_rand() * n_groups);
+        d->keys[i] = (char *)malloc(GB_KEY_LEN);
+        gb_make_key(gid, d->keys[i]);
+        d->values[i] = gb_rand();
+    }
+}
+
+void gb_free_data(gb_data *d) {
+    for (int i = 0; i < d->n_rows; i++) free(d->keys[i]);
+    free(d->keys); free(d->values);
+}
+
+unsigned int gb_hash(const char *key) {
+    unsigned int h = 2166136261u;
+    for (int i = 0; key[i]; i++) { h ^= (unsigned char)key[i]; h *= 16777619u; }
+    return h;
+}
+
+void gb_ht_init(gb_entry *ht) { memset(ht, 0, GB_HT_SIZE * sizeof(gb_entry)); }
+
+void gb_ht_insert(gb_entry *ht, const char *key, double val) {
+    unsigned int h = gb_hash(key) & (GB_HT_SIZE - 1);
+    while (ht[h].count > 0 && strcmp(ht[h].key, key) != 0) h = (h + 1) & (GB_HT_SIZE - 1);
+    if (ht[h].count == 0) memcpy(ht[h].key, key, GB_KEY_LEN);
+    ht[h].count++;
+    ht[h].sum += val;
+    ht[h].sum_sq += val * val;
+}
+
+double gb_checksum(gb_entry *ht) {
+    double cs = 0.0;
+    for (int i = 0; i < GB_HT_SIZE; i++) {
+        if (ht[i].count > 0) cs += ht[i].sum / ht[i].count;
+    }
+    return cs;
+}
+
 void print_perf(const char *name, double t) {
     printf("c,%s,%.6f\n", name, t*1000);
 }
@@ -375,6 +449,29 @@ int main() {
         if (t < tmin) tmin = t;
     }
     print_perf("print_to_file", tmin);
+
+    // groupby aggregation
+    int gb_n_rows = 50000, gb_n_groups = 100;
+    gb_data gb_d;
+    gb_generate_data(&gb_d, gb_n_rows, gb_n_groups);
+    gb_entry gb_ht[GB_HT_SIZE];
+    gb_ht_init(gb_ht);
+    for (int i = 0; i < gb_n_rows; i++) gb_ht_insert(gb_ht, gb_d.keys[i], gb_d.values[i]);
+    double gb_ref = gb_checksum(gb_ht);
+    gb_ht_init(gb_ht);
+    tmin = INFINITY;
+    double gb_cs = 0.0;
+    for (int i = 0; i < NITER; ++i) {
+        t = clock_now();
+        for (int j = 0; j < gb_n_rows; j++) gb_ht_insert(gb_ht, gb_d.keys[j], gb_d.values[j]);
+        t = clock_now() - t;
+        gb_cs += gb_checksum(gb_ht);
+        gb_ht_init(gb_ht);
+        if (t < tmin) tmin = t;
+    }
+    assert(fabs(gb_cs - gb_ref * NITER) < 1e-6);
+    print_perf("data_groupby_aggregate", tmin);
+    gb_free_data(&gb_d);
 
     return 0;
 }
