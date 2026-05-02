@@ -215,6 +215,11 @@ func pisum() float64 {
 
 const NITER = 5
 
+// groupby aggregation
+
+func gbGenerate(nr, ng int) ([]string, []float64) { r := rand.New(rand.NewSource(42)); k := make([]string, nr); v := make([]float64, nr); for i:=0;i<nr;i++{k[i]=fmt.Sprintf("g%06d", r.Intn(ng)); v[i]=r.Float64()}; return k, v }
+func gbAggregate(keys []string, vals []float64) float64 { ht:=make(map[string]*[3]float64); for i,k:=range keys { a,ok:=ht[k]; if !ok { a=&[3]float64{}; ht[k]=a }; a[0]++; a[1]+=vals[i]; a[2]+=vals[i]*vals[i] }; cs:=0.0; for _,a:=range ht { cs+=a[1]/a[0] }; return cs }
+
 func print_perf(name string, t float64) {
 	fmt.Printf("go,%v,%v\n", name, t*1000)
 }
@@ -293,5 +298,12 @@ func main() {
 
 	timeit("print_to_file", func() {
 		printfd(100000)
+	})
+
+	gbKeys, gbVals := gbGenerate(50000, 100)
+	gbRef := gbAggregate(gbKeys, gbVals)
+	if math.Abs(gbAggregate(gbKeys, gbVals)-gbRef) > 1e-6 { panic("gbAggregate not deterministic") }
+	timeit("data_groupby_aggregate", func() {
+		gbAggregate(gbKeys, gbVals)
 	})
 }
