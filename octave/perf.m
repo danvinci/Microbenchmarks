@@ -44,7 +44,11 @@ function perf()
 	timeit('matrix_multiply', @randmatmul, 1000);
 
 	printfd(1)
-	timeit('print_to_file', @printfd, 100000)
+    timeit('print_to_file', @printfd, 100000)
+
+    rc_ref = revcomp_perf(50000, 20);
+    assert(strcmp(revcomp_perf(50000, 20), rc_ref));
+    timeit('string_reverse_complement', @revcomp_perf, 50000, 20)
 
 end
 
@@ -231,4 +235,27 @@ function printfd(n)
         fprintf(f, '%d %d\n', i, i + 1);
     end
     fclose(f);
+end
+
+%% reverse-complement %%
+
+function seq = gen_rc_dna(n)
+    rand("state", 42);
+    alphabet = 'ACGT';
+    seq = alphabet(randi(4, 1, n));
+end
+
+function seq = reverse_complement(seq)
+    i = 1; j = length(seq);
+    while i <= j
+        switch seq(i); case 'A'; ci = 'T'; case 'C'; ci = 'G'; case 'G'; ci = 'C'; case 'T'; ci = 'A'; end
+        switch seq(j); case 'A'; cj = 'T'; case 'C'; cj = 'G'; case 'G'; cj = 'C'; case 'T'; cj = 'A'; end
+        seq(i) = cj; seq(j) = ci;
+        i = i + 1; j = j - 1;
+    end
+end
+
+function seq = revcomp_perf(seq_len, iters)
+    seq = gen_rc_dna(seq_len);
+    for j = 1:iters; seq = reverse_complement(seq); end
 end
