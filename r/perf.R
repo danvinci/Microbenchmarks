@@ -179,3 +179,11 @@ randmatmul = function(n) {
 
 assert(randmatmul(1000)[1] >= 0)
 timeit("matrix_multiply", randmatmul, 1000)
+
+## N-body ##
+
+nbody_init = function(n) { set.seed(42); inv_n = 1.0/n; list(x=runif(n)*2-1, y=runif(n)*2-1, z=runif(n)*2-1, vx=(runif(n)-0.5)*0.1, vy=(runif(n)-0.5)*0.1, vz=(runif(n)-0.5)*0.1, m=runif(n)*inv_n) }
+nbody_step = function(sys, dt) { n=length(sys$x); x=sys$x;y=sys$y;z=sys$z;vx=sys$vx;vy=sys$vy;vz=sys$vz;m=sys$m; for (i in 1:n) { dx=x-x[i];dy=y-y[i];dz=z-z[i];dsq=dx*dx+dy*dy+dz*dz+1e-4;inv=1/sqrt(dsq);f=inv*inv*inv*m; vx[i]=vx[i]+dt*sum(dx*f);vy[i]=vy[i]+dt*sum(dy*f);vz[i]=vz[i]+dt*sum(dz*f) }; list(x=x+dt*vx,y=y+dt*vy,z=z+dt*vz,vx=vx,vy=vy,vz=vz,m=m) }
+nbody_perf = function(n, steps, dt) { sys = nbody_init(n); for (s in 1:steps) sys = nbody_step(sys,dt); sum(sys$x)+sum(sys$y)+sum(sys$z) }
+nb_ref = nbody_perf(1000, 10, 0.01); assert(abs(nbody_perf(1000, 10, 0.01) - nb_ref) < 1e-6)
+timeit("simulation_nbody", nbody_perf, 1000, 10, 0.01)
