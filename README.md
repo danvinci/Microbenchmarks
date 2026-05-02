@@ -21,6 +21,7 @@ Times are normalized relative to C.
 | `matrix_statistics` | Statistics on random 5x5 matrices (1,000 iterations) |
 | `matrix_multiply` | Multiply two random 1,000x1,000 matrices (BLAS) |
 | `userfunc_mandelbrot` | Mandelbrot set computation over a grid |
+| `data_groupby_aggregate` | Group 50,000 rows by string key, compute per-group statistics |
 
 ## Languages
 
