@@ -453,4 +453,45 @@ const fs = require('fs'); // for print to file benchmark
     t = (new Date()).getTime()-t;
     if (t < tmin) { tmin=t; }
     console.log("javascript,matrix_multiply," + tmin);
+
+    // k-nucleotide
+    var kmer_alphabet = "ACGT";
+    var kmer_rng_state = 42;
+    function knucNextBase() {
+        kmer_rng_state = (kmer_rng_state * 1664525 + 1013904223) >>> 0;
+        return kmer_alphabet[(kmer_rng_state >>> 16) & 3];
+    }
+    function generateDna(n) {
+        kmer_rng_state = 42;
+        var seq = "", i;
+        for (i = 0; i < n; i++) seq += knucNextBase();
+        return seq;
+    }
+    function countKmers(seq, k) {
+        var ht = {}, limit = seq.length - k + 1, i, kmer, v;
+        for (i = 0; i < limit; i++) {
+            kmer = seq.substring(i, i + k);
+            v = ht[kmer];
+            ht[kmer] = v === undefined ? 1 : v + 1;
+        }
+        var total = 0;
+        for (v in ht) { if (ht.hasOwnProperty(v)) total += ht[v]; }
+        return total;
+    }
+    function kNucleotidePerf(seqLen, k, iters) {
+        var seq = generateDna(seqLen), s = 0, j;
+        for (j = 0; j < iters; j++) s += countKmers(seq, k);
+        return s;
+    }
+    assert(kNucleotidePerf(50000, 8, 1) === 50000 - 8 + 1);
+    var knucRef = kNucleotidePerf(50000, 8, 5);
+    assert(kNucleotidePerf(50000, 8, 5) === knucRef);
+    tmin = Number.POSITIVE_INFINITY;
+    for (var trial = 0; trial < 5; trial++) {
+        t = (new Date()).getTime();
+        kNucleotidePerf(50000, 8, 5);
+        t = (new Date()).getTime() - t;
+        if (t < tmin) tmin = t;
+    }
+    console.log("javascript,string_k_nucleotide," + tmin);
 }());
