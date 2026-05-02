@@ -133,6 +133,49 @@ end
 
 @timeit rand(1000, 1000) * rand(1000, 1000) "matrix_multiply"
 
+## reverse-complement ##
+
+const _rc_complement = let t = zeros(UInt8, 256)
+    t[UInt8('A')+1] = UInt8('T')
+    t[UInt8('C')+1] = UInt8('G')
+    t[UInt8('G')+1] = UInt8('C')
+    t[UInt8('T')+1] = UInt8('A')
+    t
+end
+
+function gen_rc_dna(len::Int)
+    seed!(42)
+    return rand(UInt8['A', 'C', 'G', 'T'], len)
+end
+
+function reverse_complement!(buf::Vector{UInt8})
+    i, j = 1, length(buf)
+    while i <= j
+        ci = _rc_complement[buf[i] + 1]
+        cj = _rc_complement[buf[j] + 1]
+        buf[i] = cj
+        buf[j] = ci
+        i += 1
+        j -= 1
+    end
+end
+
+function revcomp_perf(seq_len, iters)
+    seq = gen_rc_dna(seq_len)
+    buf = copy(seq)
+    for j = 1:iters
+        copyto!(buf, seq)
+        reverse_complement!(buf)
+    end
+    return sum(buf)
+end
+
+rc_len = 50000
+rc_iters = 20
+rc_ref = revcomp_perf(rc_len, rc_iters)
+@test revcomp_perf(rc_len, rc_iters) == rc_ref
+@timeit revcomp_perf(rc_len, rc_iters) "string_reverse_complement"
+
 ## printfd ##
 
 if Sys.isunix()
