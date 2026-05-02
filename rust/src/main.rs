@@ -30,14 +30,12 @@ fn nrand<R: Rng>(shape: (usize, usize), rng: &mut R) -> Array2<f64> {
     m
 }
 
-fn fib(n: i32) -> i32 {
-    let n = black_box(n); // prevent over-optimization
-    if n < 2 {
-        n
-    } else {
-        fib(n - 1) + fib(n - 2)
-    }
-}
+fn fib(n: i32) -> i32 { let n=black_box(n); if n<2 {n} else {fib(n-1)+fib(n-2)} }
+
+// groupby aggregation
+use std::collections::HashMap;
+fn gb_generate(nr:usize,ng:usize)->(Vec<String>,Vec<f64>){let mut rng=gen_rng(42u64);let mut k=Vec::with_capacity(nr);let mut v=Vec::with_capacity(nr);for _ in 0..nr{k.push(format!("g{:06}",rng.gen_range(0usize..ng)));v.push(rng.gen());}(k,v)}
+fn gb_aggregate(k:&[String],v:&[f64])->f64{let mut ht:HashMap<&str,(u64,f64,f64)>=HashMap::new();for i in 0..k.len(){let e=ht.entry(&k[i]).or_insert((0,0.0,0.0));e.0+=1;e.1+=v[i];e.2+=v[i]*v[i];}ht.values().map(|&(c,s,_)|s/c as f64).sum()}
 
 fn mandel(z: Complex64) -> u32 {
     use std::iter;
@@ -300,4 +298,13 @@ fn main() {
         printfd(100000);
     });
     print_perf("print_to_file", to_float(tmin));
+
+    // groupby
+    let (gb_keys, gb_vals) = gb_generate(50000, 100);
+    let gb_ref = gb_aggregate(&gb_keys, &gb_vals);
+    assert!((gb_aggregate(&gb_keys, &gb_vals) - gb_ref).abs() < 1e-6);
+    let mut gb_cs = 0.0;
+    let tmin = measure_best(NITER, || { gb_cs += gb_aggregate(&gb_keys, &gb_vals); });
+    black_box(gb_cs);
+    print_perf("data_groupby_aggregate", to_float(tmin));
 }
