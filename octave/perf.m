@@ -44,7 +44,11 @@ function perf()
 	timeit('matrix_multiply', @randmatmul, 1000);
 
 	printfd(1)
-	timeit('print_to_file', @printfd, 100000)
+    timeit('print_to_file', @printfd, 100000)
+
+    nb_ref = nbody_perf(1000, 10, 0.01);
+    assert(abs(nbody_perf(1000, 10, 0.01) - nb_ref) < 1e-6);
+    timeit('simulation_nbody', @nbody_perf, 1000, 10, 0.01)
 
 end
 
@@ -231,4 +235,27 @@ function printfd(n)
         fprintf(f, '%d %d\n', i, i + 1);
     end
     fclose(f);
+end
+
+%% N-body simulation %%
+
+function sys = nbody_init(n)
+    rand("state", 42);
+    inv_n = 1.0 / n; sys = cell(1,7);
+    sys{1}=sys{2}=sys{3}=sys{4}=sys{5}=sys{6}=sys{7}=zeros(1,n);
+    for i=1:n; sys{1}(i)=rand()*2-1;sys{2}(i)=rand()*2-1;sys{3}(i)=rand()*2-1;sys{4}(i)=(rand()-0.5)*0.1;sys{5}(i)=(rand()-0.5)*0.1;sys{6}(i)=(rand()-0.5)*0.1;sys{7}(i)=rand()*inv_n; end
+end
+
+function sys = nbody_step(sys, dt)
+    G=1;eps2=1e-4;n=length(sys{1});
+    for i=1:n; fx=fy=fz=0;
+        for j=1:n; dx=sys{1}(j)-sys{1}(i);dy=sys{2}(j)-sys{2}(i);dz=sys{3}(j)-sys{3}(i);dsq=dx*dx+dy*dy+dz*dz+eps2;inv=1/sqrt(dsq);inv3=inv^3;fx=fx+dx*inv3*sys{7}(j);fy=fy+dy*inv3*sys{7}(j);fz=fz+dz*inv3*sys{7}(j); end
+        sys{4}(i)=sys{4}(i)+dt*G*fx;sys{5}(i)=sys{5}(i)+dt*G*fy;sys{6}(i)=sys{6}(i)+dt*G*fz; end
+    for i=1:n; sys{1}(i)=sys{1}(i)+dt*sys{4}(i);sys{2}(i)=sys{2}(i)+dt*sys{5}(i);sys{3}(i)=sys{3}(i)+dt*sys{6}(i); end
+end
+
+function cs = nbody_perf(n, steps, dt)
+    sys = nbody_init(n);
+    for s = 1:steps; sys = nbody_step(sys, dt); end
+    cs = sum(sys{1}) + sum(sys{2}) + sum(sys{3});
 end
