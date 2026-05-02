@@ -1,11 +1,32 @@
 from numpy import *
-from numpy.random import rand, randn
+from numpy.random import rand, randn, seed, randint
 from numpy.linalg import matrix_power
 import sys
 import time
 import random
-from numba import njit, types
-from numba.typed import List as NumbaList
+from numba import njit
+
+## reverse-complement ##
+
+_RC_LUT_N = zeros(256, dtype=uint8)
+_RC_LUT_N[65] = 84; _RC_LUT_N[67] = 71; _RC_LUT_N[71] = 67; _RC_LUT_N[84] = 65
+
+def gen_rc_dna_n(n):
+    seed(42)
+    return frombuffer(b'ACGT', dtype=uint8)[randint(0, 4, n)].copy()
+
+@njit(cache=True)
+def reverse_complement_n(arr, lut):
+    i, j = 0, len(arr) - 1
+    while i <= j:
+        ci = lut[arr[i]]; cj = lut[arr[j]]
+        arr[i] = cj; arr[j] = ci
+        i += 1; j -= 1
+
+def revcomp_perf_n(seq_len, iters):
+    seq = gen_rc_dna_n(seq_len)
+    for j in range(iters): reverse_complement_n(seq, _RC_LUT_N)
+    return bytes(seq)
 
 ## fibonacci ##
 
@@ -200,3 +221,13 @@ if __name__ == "__main__":
         t = time.time()-t
         if t < tmin: tmin = t
     print_perf ("print_to_file", tmin)
+
+    rc_ref = revcomp_perf_n(50000, 20)
+    assert revcomp_perf_n(50000, 20) == rc_ref
+    tmin = float('inf')
+    for i in range(mintrials):
+        t = time.time()
+        revcomp_perf_n(50000, 20)
+        t = time.time()-t
+        if t < tmin: tmin = t
+    print_perf("string_reverse_complement", tmin)
