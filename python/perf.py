@@ -1,5 +1,5 @@
 from numpy import *
-from numpy.random import rand, randn
+from numpy.random import rand, randn, seed
 from numpy.linalg import matrix_power
 import sys
 import time
@@ -7,6 +7,50 @@ import random
 
 if sys.version_info < (3,):
     range = xrange
+
+## N-body simulation ##
+
+import math as _nbm
+
+def nbody_init(n):
+    seed(42)
+    inv_n = 1.0 / n
+    x  = (rand(n) * 2.0 - 1.0).tolist()
+    y  = (rand(n) * 2.0 - 1.0).tolist()
+    z  = (rand(n) * 2.0 - 1.0).tolist()
+    vx = ((rand(n) - 0.5) * 0.1).tolist()
+    vy = ((rand(n) - 0.5) * 0.1).tolist()
+    vz = ((rand(n) - 0.5) * 0.1).tolist()
+    m  = (rand(n) * inv_n).tolist()
+    return (x, y, z, vx, vy, vz, m)
+
+def nbody_step(sys, dt):
+    G, eps2, x, y, z, vx, vy, vz, m = 1.0, 1e-4, *sys
+    n = len(x)
+    for i in range(n):
+        fx = fy = fz = 0.0
+        xi, yi, zi = x[i], y[i], z[i]
+        for j in range(n):
+            dx = x[j] - xi; dy = y[j] - yi; dz = z[j] - zi
+            dist_sq = dx*dx + dy*dy + dz*dz + eps2
+            inv_dist = 1.0 / _nbm.sqrt(dist_sq)
+            inv_dist3 = inv_dist * inv_dist * inv_dist
+            fx += dx * inv_dist3 * m[j]
+            fy += dy * inv_dist3 * m[j]
+            fz += dz * inv_dist3 * m[j]
+        vx[i] += dt * G * fx
+        vy[i] += dt * G * fy
+        vz[i] += dt * G * fz
+    for i in range(n):
+        x[i] += dt * vx[i]
+        y[i] += dt * vy[i]
+        z[i] += dt * vz[i]
+
+def nbody_perf(n, steps, dt):
+    sys = nbody_init(n)
+    for s in range(steps):
+        nbody_step(sys, dt)
+    return sum(sys[0]) + sum(sys[1]) + sum(sys[2])
 
 ## fibonacci ##
 
@@ -190,6 +234,16 @@ if __name__=="__main__":
         t = time.time()-t
         if t < tmin: tmin = t
     print_perf ("matrix_multiply", tmin)
+
+    nb_ref = nbody_perf(1000, 10, 0.01)
+    assert abs(nbody_perf(1000, 10, 0.01) - nb_ref) < 1e-6
+    tmin = float('inf')
+    for i in range(mintrials):
+        t = time.time()
+        nbody_perf(1000, 10, 0.01)
+        t = time.time()-t
+        if t < tmin: tmin = t
+    print_perf("simulation_nbody", tmin)
 
     tmin = float('inf')
     for i in range(mintrials):
