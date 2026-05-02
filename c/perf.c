@@ -229,6 +229,48 @@ void printfd(int n) {
     fclose(f);
 }
 
+// reverse-complement
+
+static const char revcomp_table[256] = {
+    ['A']='T', ['C']='G', ['G']='C', ['T']='A',
+    ['a']='t', ['c']='g', ['g']='c', ['t']='a',
+};
+
+static unsigned int revcomp_rng_state = 42;
+
+char revcomp_next_base(void) {
+    revcomp_rng_state = revcomp_rng_state * 1664525 + 1013904223;
+    return "ACGT"[(revcomp_rng_state >> 16) & 3];
+}
+
+char *generate_revcomp_seq(int len) {
+    revcomp_rng_state = 42;
+    char *seq = (char *)malloc(len + 1);
+    for (int i = 0; i < len; i++) {
+        seq[i] = revcomp_next_base();
+    }
+    seq[len] = '\0';
+    return seq;
+}
+
+void reverse_complement(char *seq, int len) {
+    int i = 0, j = len - 1;
+    while (i <= j) {
+        char ci = revcomp_table[(unsigned char)seq[i]];
+        char cj = revcomp_table[(unsigned char)seq[j]];
+        seq[i] = cj;
+        seq[j] = ci;
+        i++;
+        j--;
+    }
+}
+
+int revcomp_checksum(char *seq, int len) {
+    int sum = 0;
+    for (int i = 0; i < len; i++) sum += (unsigned char)seq[i];
+    return sum;
+}
+
 void print_perf(const char *name, double t) {
     printf("c,%s,%.6f\n", name, t*1000);
 }
@@ -375,6 +417,31 @@ int main() {
         if (t < tmin) tmin = t;
     }
     print_perf("print_to_file", tmin);
+
+    // reverse-complement
+    int rc_seq_len = 50000;
+    int rc_iters = 20;
+    char *rc_seq = generate_revcomp_seq(rc_seq_len);
+    char *rc_buf = (char *)malloc(rc_seq_len);
+    memcpy(rc_buf, rc_seq, rc_seq_len);
+    reverse_complement(rc_buf, rc_seq_len);
+    int rc_ref = revcomp_checksum(rc_buf, rc_seq_len);
+    int rc_sum = 0;
+    tmin = INFINITY;
+    for (int i = 0; i < NITER; ++i) {
+        t = clock_now();
+        for (int j = 0; j < rc_iters; j++) {
+            memcpy(rc_buf, rc_seq, rc_seq_len);
+            reverse_complement(rc_buf, rc_seq_len);
+            rc_sum += revcomp_checksum(rc_buf, rc_seq_len);
+        }
+        t = clock_now() - t;
+        if (t < tmin) tmin = t;
+    }
+    assert(rc_sum == rc_ref * NITER * rc_iters);
+    print_perf("string_reverse_complement", tmin);
+    free(rc_seq);
+    free(rc_buf);
 
     return 0;
 }
