@@ -30,14 +30,12 @@ fn nrand<R: Rng>(shape: (usize, usize), rng: &mut R) -> Array2<f64> {
     m
 }
 
-fn fib(n: i32) -> i32 {
-    let n = black_box(n); // prevent over-optimization
-    if n < 2 {
-        n
-    } else {
-        fib(n - 1) + fib(n - 2)
-    }
-}
+fn fib(n: i32) -> i32 { let n=black_box(n); if n<2 {n} else {fib(n-1)+fib(n-2)} }
+
+// graph BFS
+use std::collections::VecDeque;
+fn bfs_create(v:usize,e:usize)->Vec<Vec<usize>>{let mut rng=gen_rng(42u64);let mut adj=vec![Vec::new();v];for _ in 0..e{let u=rng.gen_range(0usize..v);let w=rng.gen_range(0usize..v);adj[u].push(w);adj[w].push(u)};adj}
+fn bfs_search(adj:&[Vec<usize>],start:usize)->usize{let v=adj.len();let mut vis=vec![false;v];let mut q=VecDeque::new();q.push_back(start);vis[start]=true;let mut cnt=1;while let Some(u)=q.pop_front(){for &n in &adj[u]{if!vis[n]{vis[n]=true;q.push_back(n);cnt+=1}}};cnt}
 
 fn mandel(z: Complex64) -> u32 {
     use std::iter;
@@ -300,4 +298,14 @@ fn main() {
         printfd(100000);
     });
     print_perf("print_to_file", to_float(tmin));
+
+    // bfs
+    let bfs_adj = bfs_create(5000, 20000);
+    let bfs_ref = bfs_search(&bfs_adj, 0);
+    assert_eq!(bfs_search(&bfs_adj, 0), bfs_ref);
+    let mut bfs_cnt = 0;
+    let tmin = measure_best(NITER, || { bfs_cnt += bfs_search(&bfs_adj, 0); });
+    assert_eq!(bfs_cnt, bfs_ref * NITER as usize);
+    black_box(bfs_cnt);
+    print_perf("algorithm_graph_bfs", to_float(tmin));
 }
