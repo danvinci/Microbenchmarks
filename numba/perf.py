@@ -1,11 +1,46 @@
 from numpy import *
-from numpy.random import rand, randn
+from numpy.random import rand, randn, seed
 from numpy.linalg import matrix_power
 import sys
 import time
 import random
-from numba import njit, types
-from numba.typed import List as NumbaList
+from numba import njit
+import math
+
+## N-body simulation ##
+
+def nbody_init_n(n):
+    seed(42)
+    inv_n = 1.0 / n
+    x  = rand(n) * 2.0 - 1.0
+    y  = rand(n) * 2.0 - 1.0
+    z  = rand(n) * 2.0 - 1.0
+    vx = (rand(n) - 0.5) * 0.1
+    vy = (rand(n) - 0.5) * 0.1
+    vz = (rand(n) - 0.5) * 0.1
+    m  = rand(n) * inv_n
+    return x, y, z, vx, vy, vz, m
+
+@njit(cache=True)
+def nbody_step_n(x, y, z, vx, vy, vz, m, dt):
+    G, eps2 = 1.0, 1e-4
+    n = len(x)
+    for i in range(n):
+        fx = 0.0; fy = 0.0; fz = 0.0
+        xi = x[i]; yi = y[i]; zi = z[i]
+        for j in range(n):
+            dx = x[j] - xi; dy = y[j] - yi; dz = z[j] - zi
+            dsq = dx*dx + dy*dy + dz*dz + eps2
+            inv = 1.0 / math.sqrt(dsq); inv3 = inv * inv * inv
+            fx += dx * inv3 * m[j]; fy += dy * inv3 * m[j]; fz += dz * inv3 * m[j]
+        vx[i] += dt * G * fx; vy[i] += dt * G * fy; vz[i] += dt * G * fz
+    for i in range(n):
+        x[i] += dt * vx[i]; y[i] += dt * vy[i]; z[i] += dt * vz[i]
+
+def nbody_perf_n(n, steps, dt):
+    x, y, z, vx, vy, vz, m = nbody_init_n(n)
+    for s in range(steps): nbody_step_n(x, y, z, vx, vy, vz, m, dt)
+    return x.sum() + y.sum() + z.sum()
 
 ## fibonacci ##
 
@@ -200,3 +235,13 @@ if __name__ == "__main__":
         t = time.time()-t
         if t < tmin: tmin = t
     print_perf ("print_to_file", tmin)
+
+    nb_ref = nbody_perf_n(1000, 10, 0.01)
+    assert abs(nbody_perf_n(1000, 10, 0.01) - nb_ref) < 1e-6
+    tmin = float('inf')
+    for i in range(mintrials):
+        t = time.time()
+        nbody_perf_n(1000, 10, 0.01)
+        t = time.time()-t
+        if t < tmin: tmin = t
+    print_perf("simulation_nbody", tmin)
