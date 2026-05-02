@@ -181,7 +181,10 @@ use utils, only: trace, randn, std, mean, stop_error
 use types, only: dp
 implicit none
 private
-public fib, parse_int, printfd, quicksort, mandelperf, pisum, randmatstat, randmatmul
+public fib, parse_int, printfd, quicksort, mandelperf, pisum, randmatstat, randmatmul, &
+    nbody_init, nbody_step, nbody_checksum, nb_x, nb_y, nb_z, nb_vx, nb_vy, nb_vz, nb_m
+
+real(dp), allocatable :: nb_x(:), nb_y(:), nb_z(:), nb_vx(:), nb_vy(:), nb_vz(:), nb_m(:)
 
 contains
 
@@ -193,6 +196,41 @@ else
     r = fib(n-1) + fib(n-2)
 end if
 end function
+
+! N-body simulation
+
+subroutine nb_seed_fixed()
+    integer :: n; integer, allocatable :: seed(:)
+    call random_seed(size=n); allocate(seed(n)); seed = 42
+    call random_seed(put=seed); deallocate(seed)
+end subroutine
+
+real(dp) function nb_rand() result(r)
+    call random_number(r)
+end function
+
+subroutine nbody_init(n)
+    integer, intent(in) :: n; integer :: i; real(dp) :: inv_n
+    allocate(nb_x(n), nb_y(n), nb_z(n), nb_vx(n), nb_vy(n), nb_vz(n), nb_m(n))
+    call nb_seed_fixed(); inv_n = 1.0_dp / n
+    do i = 1, n; nb_x(i)=nb_rand()*2-1; nb_y(i)=nb_rand()*2-1; nb_z(i)=nb_rand()*2-1; nb_vx(i)=(nb_rand()-0.5)*0.1; nb_vy(i)=(nb_rand()-0.5)*0.1; nb_vz(i)=(nb_rand()-0.5)*0.1; nb_m(i)=nb_rand()*inv_n; end do
+end subroutine
+
+real(dp) function nbody_checksum() result(cs)
+    integer :: i
+    cs = 0
+    do i = 1, size(nb_x); cs = cs + nb_x(i) + nb_y(i) + nb_z(i); end do
+end function
+
+subroutine nbody_step(dt)
+    real(dp), intent(in) :: dt; real(dp) :: G, eps2, fx, fy, fz, dx, dy, dz, dsq, inv, inv3; integer :: i, j, n
+    G = 1.0_dp; eps2 = 1e-4_dp; n = size(nb_x)
+    do i = 1, n; fx = 0; fy = 0; fz = 0
+        do j = 1, n; dx = nb_x(j)-nb_x(i); dy = nb_y(j)-nb_y(i); dz = nb_z(j)-nb_z(i); dsq = dx*dx+dy*dy+dz*dz+eps2; inv = 1.0_dp/sqrt(dsq); inv3 = inv*inv*inv; fx = fx+dx*inv3*nb_m(j); fy = fy+dy*inv3*nb_m(j); fz = fz+dz*inv3*nb_m(j); end do
+        nb_vx(i) = nb_vx(i)+dt*G*fx; nb_vy(i) = nb_vy(i)+dt*G*fy; nb_vz(i) = nb_vz(i)+dt*G*fz
+    end do
+    do i = 1, n; nb_x(i)=nb_x(i)+dt*nb_vx(i); nb_y(i)=nb_y(i)+dt*nb_vy(i); nb_z(i)=nb_z(i)+dt*nb_vz(i); end do
+end subroutine
 
 integer function parse_int(s, base) result(n)
 character(len=*), intent(in) :: s
@@ -358,14 +396,14 @@ program perf
 use types, only: dp, i64
 use utils, only: assert, init_random_seed, sysclock2ms, hex_string
 use bench, only: fib, parse_int, printfd, quicksort, mandelperf, pisum, randmatstat, &
-    randmatmul
+    randmatmul, nbody_init, nbody_step, nbody_checksum, nb_x, nb_y, nb_z, nb_vx, nb_vy, nb_vz, nb_m
 implicit none
 
 integer, parameter :: NRUNS = 1000
 integer :: i, n, m, k, k2
 integer, volatile :: fibarg, f
 integer(i64) :: t1, t2, tmin
-real(dp) :: pi, s1, s2
+real(dp) :: pi, s1, s2, nb_ref
 real(dp), allocatable :: C(:, :), d(:)
 character(len=11) :: s
 
@@ -465,5 +503,22 @@ do i = 1, 5
     if (t2-t1 < tmin) tmin = t2-t1
 end do
 print "('fortran,matrix_multiply,',f0.6)", sysclock2ms(tmin)
+
+! nbody
+call nbody_init(1000)
+do k = 1, 10; call nbody_step(0.01_dp); end do
+nb_ref = nbody_checksum()
+deallocate(nb_x,nb_y,nb_z,nb_vx,nb_vy,nb_vz,nb_m)
+tmin = huge(0_i64)
+do i = 1, 5
+    call nbody_init(1000)
+    call system_clock(t1)
+    do k = 1, 10; call nbody_step(0.01_dp); end do
+    call system_clock(t2)
+    call assert(abs(nbody_checksum() - nb_ref) < 1e-6_dp)
+    deallocate(nb_x,nb_y,nb_z,nb_vx,nb_vy,nb_vz,nb_m)
+    if (t2-t1 < tmin) tmin = t2-t1
+end do
+print "('fortran,simulation_nbody,',f0.6)", sysclock2ms(tmin)
 
 end program
