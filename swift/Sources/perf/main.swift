@@ -35,6 +35,38 @@ func blackHole<T>(_ x: T) {
 }
 
 // ---------------------------------------------------------------------------
+// N-body simulation
+// ---------------------------------------------------------------------------
+
+var nbRngState: UInt32 = 42
+
+func nbRand() -> Double {
+    nbRngState = nbRngState &* 1664525 &+ 1013904223
+    return Double(nbRngState & 0x7FFFFFFF) / Double(0x7FFFFFFF)
+}
+func nbodyInit(_ n: Int) -> [[Double]] {
+    nbRngState = 42; let invN = 1.0 / Double(n)
+    var x=[Double](), y=[Double](), z=[Double](), vx=[Double](), vy=[Double](), vz=[Double](), m=[Double]()
+    for _ in 0..<n { x.append(nbRand()*2-1); y.append(nbRand()*2-1); z.append(nbRand()*2-1)
+        vx.append((nbRand()-0.5)*0.1); vy.append((nbRand()-0.5)*0.1); vz.append((nbRand()-0.5)*0.1)
+        m.append(nbRand()*invN) }
+    return [x,y,z,vx,vy,vz,m]
+}
+func nbodyStep(_ sys: inout [[Double]], _ dt: Double) {
+    let n = sys[0].count; let G=1.0; let eps2=1e-4
+    for i in 0..<n { var fx=0.0,fy=0.0,fz=0.0; let xi=sys[0][i],yi=sys[1][i],zi=sys[2][i]
+        for j in 0..<n { let dx=sys[0][j]-xi,dy=sys[1][j]-yi,dz=sys[2][j]-zi
+            let dsq=dx*dx+dy*dy+dz*dz+eps2; let inv=1.0/dsq.squareRoot(); let inv3=inv*inv*inv
+            fx+=dx*inv3*sys[6][j]; fy+=dy*inv3*sys[6][j]; fz+=dz*inv3*sys[6][j] }
+        sys[3][i]+=dt*G*fx; sys[4][i]+=dt*G*fy; sys[5][i]+=dt*G*fz }
+    for i in 0..<n { sys[0][i]+=dt*sys[3][i]; sys[1][i]+=dt*sys[4][i]; sys[2][i]+=dt*sys[5][i] }
+}
+func nbodyPerf(_ n: Int, _ steps: Int, _ dt: Double) -> Double {
+    var sys = nbodyInit(n); for _ in 0..<steps { nbodyStep(&sys, dt) }
+    var cs=0.0; for i in 0..<n { cs+=sys[0][i]+sys[1][i]+sys[2][i] }; return cs
+}
+
+// ---------------------------------------------------------------------------
 // Fibonacci
 // ---------------------------------------------------------------------------
 
@@ -414,3 +446,17 @@ for _ in 0..<NITER {
     if elapsed < tmin { tmin = elapsed }
 }
 printPerf("print_to_file", tmin)
+
+// nbody
+let nbRef = nbodyPerf(1000, 10, 0.01)
+precondition(abs(nbodyPerf(1000, 10, 0.01) - nbRef) < 1e-6)
+var nbSum = 0.0
+tmin = Double.infinity
+for _ in 0..<NITER {
+    let t = clockNow()
+    nbSum += nbodyPerf(1000, 10, 0.01)
+    let elapsed = clockNow() - t
+    if elapsed < tmin { tmin = elapsed }
+}
+blackHole(nbSum)
+printPerf("simulation_nbody", tmin)
