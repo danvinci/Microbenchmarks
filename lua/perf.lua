@@ -217,3 +217,11 @@ if jit.os ~= 'Windows' then
 
     timeit(function() return printfd(100000) end, 'print_to_file')
 end
+
+-- N-body simulation
+local function nbody_init(n) math.randomseed(42); local inv_n=1.0/n; local x,y,z,vx,vy,vz,m={},{},{},{},{},{},{}; for i=1,n do x[i]=math.random()*2-1;y[i]=math.random()*2-1;z[i]=math.random()*2-1;vx[i]=(math.random()-0.5)*0.1;vy[i]=(math.random()-0.5)*0.1;vz[i]=(math.random()-0.5)*0.1;m[i]=math.random()*inv_n end; return {x=x,y=y,z=z,vx=vx,vy=vy,vz=vz,m=m,n=n} end
+local function nbody_step(sys,dt) local G,eps2=1,1e-4; local x,y,z,vx,vy,vz,m,n=sys.x,sys.y,sys.z,sys.vx,sys.vy,sys.vz,sys.m,sys.n; for i=1,n do local fx,fy,fz,xi,yi,zi=0,0,0,x[i],y[i],z[i]; for j=1,n do local dx,dy,dz=x[j]-xi,y[j]-yi,z[j]-zi; local dsq=dx*dx+dy*dy+dz*dz+eps2; local inv=1/math.sqrt(dsq); local inv3=inv*inv*inv; fx=fx+dx*inv3*m[j];fy=fy+dy*inv3*m[j];fz=fz+dz*inv3*m[j] end; vx[i]=vx[i]+dt*G*fx;vy[i]=vy[i]+dt*G*fy;vz[i]=vz[i]+dt*G*fz end; for i=1,n do x[i]=x[i]+dt*vx[i];y[i]=y[i]+dt*vy[i];z[i]=z[i]+dt*vz[i] end end
+local function nbody_perf(n,steps,dt) local sys=nbody_init(n); for s=1,steps do nbody_step(sys,dt) end; local cs=0; for i=1,n do cs=cs+sys.x[i]+sys.y[i]+sys.z[i] end; return cs end
+local nb_ref = nbody_perf(1000,10,0.01)
+timeit(function() return nbody_perf(1000,10,0.01) end, 'simulation_nbody',
+    function(c) assert(math.abs(c - nb_ref) < 1e-6) end)
