@@ -229,6 +229,84 @@ void printfd(int n) {
     fclose(f);
 }
 
+// k-nucleotide counting
+
+#define KNUC_HT_SIZE 131072
+#define KNUC_KMER_LEN 8
+
+typedef struct {
+    char key[KNUC_KMER_LEN];
+    int count;
+} knuc_entry;
+
+typedef struct {
+    knuc_entry *entries;
+} knuc_ht;
+
+// FNV-1a hash on 8 bytes
+static inline unsigned int knuc_hash(const char *key) {
+    unsigned int h = 2166136261u;
+    for (int i = 0; i < KNUC_KMER_LEN; i++) {
+        h ^= (unsigned char)key[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+void knuc_ht_init(knuc_ht *ht) {
+    ht->entries = (knuc_entry *)calloc(KNUC_HT_SIZE, sizeof(knuc_entry));
+}
+
+void knuc_ht_clear(knuc_ht *ht) {
+    memset(ht->entries, 0, KNUC_HT_SIZE * sizeof(knuc_entry));
+}
+
+void knuc_ht_inc(knuc_ht *ht, const char *key) {
+    unsigned int h = knuc_hash(key) & (KNUC_HT_SIZE - 1);
+    while (ht->entries[h].count > 0) {
+        if (memcmp(ht->entries[h].key, key, KNUC_KMER_LEN) == 0) {
+            ht->entries[h].count++;
+            return;
+        }
+        h = (h + 1) & (KNUC_HT_SIZE - 1);
+    }
+    memcpy(ht->entries[h].key, key, KNUC_KMER_LEN);
+    ht->entries[h].count = 1;
+}
+
+int knuc_ht_sum(knuc_ht *ht) {
+    int sum = 0;
+    for (int i = 0; i < KNUC_HT_SIZE; i++) {
+        sum += ht->entries[i].count;
+    }
+    return sum;
+}
+
+// LCG for generating DNA sequence (matching across languages)
+static unsigned int knuc_rng_state = 42;
+
+char knuc_next_base(void) {
+    knuc_rng_state = knuc_rng_state * 1664525 + 1013904223;
+    return "ACGT"[(knuc_rng_state >> 16) & 3];
+}
+
+void generate_dna(char *seq, int len) {
+    knuc_rng_state = 42;
+    for (int i = 0; i < len; i++) {
+        seq[i] = knuc_next_base();
+    }
+    seq[len] = '\0';
+}
+
+int count_kmers(const char *seq, int seq_len, int k, knuc_ht *ht) {
+    knuc_ht_clear(ht);
+    int limit = seq_len - k + 1;
+    for (int i = 0; i < limit; i++) {
+        knuc_ht_inc(ht, seq + i);
+    }
+    return knuc_ht_sum(ht);
+}
+
 void print_perf(const char *name, double t) {
     printf("c,%s,%.6f\n", name, t*1000);
 }
@@ -375,6 +453,36 @@ int main() {
         if (t < tmin) tmin = t;
     }
     print_perf("print_to_file", tmin);
+
+    // k-nucleotide
+    int kmer_seq_len = 50000;
+    int kmer_k = 8;
+    int kmer_iters = 5;
+    int kmer_expected = kmer_iters * (kmer_seq_len - kmer_k + 1);
+    char *dna_seq = (char *)malloc(kmer_seq_len + 1);
+    knuc_ht ht;
+    knuc_ht_init(&ht);
+    generate_dna(dna_seq, kmer_seq_len);
+    count_kmers(dna_seq, kmer_seq_len, kmer_k, &ht);
+    assert(knuc_ht_sum(&ht) == kmer_seq_len - kmer_k + 1);
+    static volatile int kmer_sum_init = 0;
+    int kmer_sum2 = kmer_sum_init;
+    tmin = INFINITY;
+    for (int i = 0; i < NITER; ++i) {
+        t = clock_now();
+        generate_dna(dna_seq, kmer_seq_len);
+        int s = 0;
+        for (int j = 0; j < kmer_iters; j++) {
+            s += count_kmers(dna_seq, kmer_seq_len, kmer_k, &ht);
+        }
+        t = clock_now() - t;
+        kmer_sum2 += s;
+        if (t < tmin) tmin = t;
+    }
+    assert(kmer_sum2 == kmer_expected * NITER);
+    print_perf("string_k_nucleotide", tmin);
+    free(dna_seq);
+    free(ht.entries);
 
     return 0;
 }
