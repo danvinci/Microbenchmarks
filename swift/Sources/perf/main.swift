@@ -35,6 +35,13 @@ func blackHole<T>(_ x: T) {
 }
 
 // ---------------------------------------------------------------------------
+// Graph BFS
+// ---------------------------------------------------------------------------
+
+func bfsCreate(_ V: Int, _ E: Int) -> [[Int]] { var adj=[[Int]](repeating:[], count:V); for _ in 0..<E { let u=Int.random(in: 0..<V), v=Int.random(in: 0..<V); adj[u].append(v); adj[v].append(u) }; return adj }
+func bfsSearch(_ adj: [[Int]], _ start: Int) -> Int { let V=adj.count; var vis=[Bool](repeating:false, count:V); var q=[start]; vis[start]=true; var cnt=1; while !q.isEmpty { let u=q.removeFirst(); for v in adj[u] { if !vis[v] { vis[v]=true; q.append(v); cnt+=1 } } }; return cnt }
+
+// ---------------------------------------------------------------------------
 // Fibonacci
 // ---------------------------------------------------------------------------
 
@@ -414,3 +421,13 @@ for _ in 0..<NITER {
     if elapsed < tmin { tmin = elapsed }
 }
 printPerf("print_to_file", tmin)
+
+// bfs
+let bfsAdj = bfsCreate(5000, 20000)
+let bfsRef = bfsSearch(bfsAdj, 0)
+precondition(bfsSearch(bfsAdj, 0) == bfsRef)
+var bfsCnt = 0
+tmin = Double.infinity
+for _ in 0..<NITER { let t=clockNow(); bfsCnt+=bfsSearch(bfsAdj,0); let e=clockNow()-t; if e<tmin{tmin=e} }
+precondition(bfsCnt == bfsRef * NITER)
+blackHole(bfsCnt); printPerf("algorithm_graph_bfs", tmin)
