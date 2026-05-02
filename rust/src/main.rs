@@ -39,6 +39,34 @@ fn fib(n: i32) -> i32 {
     }
 }
 
+// k-nucleotide counting
+
+use std::collections::HashMap;
+
+fn generate_dna(n: usize) -> Vec<u8> {
+    let mut rng = gen_rng(42u64);
+    let alpha = b"ACGT";
+    let mut buf = Vec::with_capacity(n);
+    for _ in 0..n { buf.push(alpha[rng.gen_range(0usize..4)]); }
+    buf
+}
+
+fn count_kmers(seq: &[u8], k: usize) -> usize {
+    let mut ht: HashMap<&[u8], usize> = HashMap::new();
+    let limit = seq.len() - k + 1;
+    for i in 0..limit {
+        *ht.entry(&seq[i..i+k]).or_insert(0) += 1;
+    }
+    ht.values().sum()
+}
+
+fn k_nucleotide_perf(seq_len: usize, k: usize, iters: usize) -> usize {
+    let seq = generate_dna(seq_len);
+    let mut s = 0;
+    for _ in 0..iters { s += count_kmers(&seq, k); }
+    s
+}
+
 fn mandel(z: Complex64) -> u32 {
     use std::iter;
 
@@ -300,4 +328,17 @@ fn main() {
         printfd(100000);
     });
     print_perf("print_to_file", to_float(tmin));
+
+    // k-nucleotide
+    let kmer_seq_len = 50000;
+    let kmer_k = 8;
+    let kmer_iters = 5;
+    assert_eq!(k_nucleotide_perf(kmer_seq_len, kmer_k, 1), kmer_seq_len - kmer_k + 1);
+    let mut kmer_sum: usize = 0;
+    let tmin = measure_best(NITER, || {
+        let s = k_nucleotide_perf(kmer_seq_len, kmer_k, kmer_iters);
+        kmer_sum = kmer_sum.wrapping_add(s);
+    });
+    assert_eq!(kmer_sum, kmer_iters * (kmer_seq_len - kmer_k + 1) * NITER as usize);
+    print_perf("string_k_nucleotide", to_float(tmin));
 }
