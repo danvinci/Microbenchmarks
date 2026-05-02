@@ -453,4 +453,14 @@ const fs = require('fs'); // for print to file benchmark
     t = (new Date()).getTime()-t;
     if (t < tmin) { tmin=t; }
     console.log("javascript,matrix_multiply," + tmin);
+
+    // graph BFS
+    function bfsCreate(V,E){var adj=[],i;for(i=0;i<V;i++)adj[i]=[];for(i=0;i<E;i++){var u=Math.floor(Math.random()*V),v=Math.floor(Math.random()*V);adj[u].push(v);adj[v].push(u)}return adj}
+    function bfsSearch(adj,start){var V=adj.length,vis=[],q=[],i;for(i=0;i<V;i++)vis[i]=false;q.push(start);vis[start]=true;var cnt=1;while(q.length>0){var u=q.shift();for(var j=0;j<adj[u].length;j++){var v=adj[u][j];if(!vis[v]){vis[v]=true;q.push(v);cnt++}}}return cnt}
+    var bfsAdj=bfsCreate(5000,20000);
+    var bfsRef=bfsSearch(bfsAdj,0);
+    assert(bfsSearch(bfsAdj,0)===bfsRef);
+    tmin=Number.POSITIVE_INFINITY;
+    for(var trial=0;trial<5;trial++){t=(new Date()).getTime();for(var k=0;k<100;k++)bfsSearch(bfsAdj,0);t=(new Date()).getTime()-t;if(t<tmin)tmin=t}
+    console.log("javascript,algorithm_graph_bfs,"+tmin/100);
 }());
