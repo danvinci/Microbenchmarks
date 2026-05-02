@@ -229,6 +229,65 @@ void printfd(int n) {
     fclose(f);
 }
 
+// graph BFS
+
+typedef struct bfs_node {
+    int vertex;
+    struct bfs_node *next;
+} bfs_node;
+
+typedef struct {
+    int V;
+    bfs_node **adj;
+} bfs_graph;
+
+static unsigned int bfs_rng_state = 42;
+
+int bfs_rand_int(int max) {
+    bfs_rng_state = bfs_rng_state * 1664525 + 1013904223;
+    return (int)(((unsigned long long)(bfs_rng_state & 0x7FFFFFFF) * max) >> 31);
+}
+
+bfs_graph *bfs_create(int V, int E) {
+    bfs_rng_state = 42;
+    bfs_graph *g = (bfs_graph *)malloc(sizeof(bfs_graph));
+    g->V = V;
+    g->adj = (bfs_node **)calloc(V, sizeof(bfs_node *));
+    for (int i = 0; i < E; i++) {
+        int u = bfs_rand_int(V);
+        int v = bfs_rand_int(V);
+        bfs_node *n = (bfs_node *)malloc(sizeof(bfs_node));
+        n->vertex = v; n->next = g->adj[u]; g->adj[u] = n;
+        n = (bfs_node *)malloc(sizeof(bfs_node));
+        n->vertex = u; n->next = g->adj[v]; g->adj[v] = n;
+    }
+    return g;
+}
+
+void bfs_free(bfs_graph *g) {
+    for (int i = 0; i < g->V; i++) {
+        bfs_node *n = g->adj[i];
+        while (n) { bfs_node *t = n; n = n->next; free(t); }
+    }
+    free(g->adj); free(g);
+}
+
+int bfs_search(bfs_graph *g, int start) {
+    unsigned char *visited = (unsigned char *)calloc(g->V, 1);
+    int *queue = (int *)malloc(g->V * sizeof(int));
+    int head = 0, tail = 0, count = 0;
+    queue[tail++] = start; visited[start] = 1; count++;
+    while (head < tail) {
+        int u = queue[head++];
+        for (bfs_node *n = g->adj[u]; n; n = n->next) {
+            int v = n->vertex;
+            if (!visited[v]) { visited[v] = 1; queue[tail++] = v; count++; }
+        }
+    }
+    free(visited); free(queue);
+    return count;
+}
+
 void print_perf(const char *name, double t) {
     printf("c,%s,%.6f\n", name, t*1000);
 }
@@ -375,6 +434,23 @@ int main() {
         if (t < tmin) tmin = t;
     }
     print_perf("print_to_file", tmin);
+
+    // graph BFS
+    int bfs_V = 5000, bfs_E = 20000;
+    bfs_graph *bfs_g = bfs_create(bfs_V, bfs_E);
+    int bfs_ref = bfs_search(bfs_g, 0);
+    volatile int bfs_count = 0;
+    tmin = INFINITY;
+    for (int i = 0; i < NITER; ++i) {
+        t = clock_now();
+        int c = bfs_search(bfs_g, 0);
+        t = clock_now() - t;
+        bfs_count += c;
+        if (t < tmin) tmin = t;
+    }
+    assert(bfs_count == bfs_ref * NITER);
+    print_perf("algorithm_graph_bfs", tmin);
+    bfs_free(bfs_g);
 
     return 0;
 }
