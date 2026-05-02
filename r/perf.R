@@ -179,3 +179,10 @@ randmatmul = function(n) {
 
 assert(randmatmul(1000)[1] >= 0)
 timeit("matrix_multiply", randmatmul, 1000)
+
+## graph BFS ##
+
+bfs_create = function(V, E) { set.seed(42); adj = replicate(V, integer(0), simplify=FALSE); for (i in 1:E) { u = sample.int(V, 1); v = sample.int(V, 1); adj[[u]] = c(adj[[u]], v); adj[[v]] = c(adj[[v]], u) }; adj }
+bfs_search = function(adj, start) { V = length(adj); vis = logical(V); q = integer(); q = c(q, start); vis[start] = TRUE; cnt = 1L; while (length(q) > 0) { u = q[1]; q = q[-1]; for (v in adj[[u]]) { if (!vis[v]) { vis[v] = TRUE; q = c(q, v); cnt = cnt + 1L } } }; cnt }
+bfs_adj = bfs_create(5000, 20000); bfs_ref = bfs_search(bfs_adj, 1L); assert(bfs_search(bfs_adj, 1L) == bfs_ref)
+timeit("algorithm_graph_bfs", bfs_search, bfs_adj, 1L)
