@@ -277,5 +277,23 @@ object Perf {
       tmin = math.min(tmin, System.nanoTime() - t)
     }
     printPerf("print_to_file", tmin)
+
+    // nbody
+    val nbRef = nbodyPerf(1000, 10, 0.01)
+    assert(math.abs(nbodyPerf(1000, 10, 0.01) - nbRef) < 1e-6)
+    var nbCs = 0.0
+    tmin = Long.MaxValue
+    for (_ <- 0 until NITER) {
+      t = System.nanoTime()
+      nbCs += nbodyPerf(1000, 10, 0.01)
+      tmin = math.min(tmin, System.nanoTime() - t)
+    }
+    sink = nbCs
+    printPerf("simulation_nbody", tmin)
   }
+
+  // N-body simulation
+  def nbodyInit(n: Int): Array[Array[Double]] = { val r = new scala.util.Random(42); val invN = 1.0/n; val x=Array.fill(n)(r.nextDouble()*2-1);val y=Array.fill(n)(r.nextDouble()*2-1);val z=Array.fill(n)(r.nextDouble()*2-1);val vx=Array.fill(n)((r.nextDouble()-0.5)*0.1);val vy=Array.fill(n)((r.nextDouble()-0.5)*0.1);val vz=Array.fill(n)((r.nextDouble()-0.5)*0.1);val m=Array.fill(n)(r.nextDouble()*invN);Array(x,y,z,vx,vy,vz,m) }
+  def nbodyStep(s: Array[Array[Double]], dt: Double): Unit = { val n=s(0).length;val G=1.0;val eps2=1e-4;val x=s(0);val y=s(1);val z=s(2);val vx=s(3);val vy=s(4);val vz=s(5);val m=s(6);for(i<-0 until n){var fx=0.0;var fy=0.0;var fz=0.0;val xi=x(i);val yi=y(i);val zi=z(i);for(j<-0 until n){val dx=x(j)-xi;val dy=y(j)-yi;val dz=z(j)-zi;val dsq=dx*dx+dy*dy+dz*dz+eps2;val inv=1.0/math.sqrt(dsq);val inv3=inv*inv*inv;fx+=dx*inv3*m(j);fy+=dy*inv3*m(j);fz+=dz*inv3*m(j)};vx(i)+=dt*G*fx;vy(i)+=dt*G*fy;vz(i)+=dt*G*fz};for(i<-0 until n){x(i)+=dt*vx(i);y(i)+=dt*vy(i);z(i)+=dt*vz(i)} }
+  def nbodyPerf(n: Int, steps: Int, dt: Double): Double = { val s = nbodyInit(n); for (_ <- 0 until steps) nbodyStep(s, dt); var cs=0.0; for (i <- 0 until n) cs+=s(0)(i)+s(1)(i)+s(2)(i); cs }
 }
