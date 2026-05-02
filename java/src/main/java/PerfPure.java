@@ -122,6 +122,21 @@ public class PerfPure {
         }
         print_perf("matrix_multiply", tmin);
 
+        // groupby
+        Object[] gbD = gbGenerate(50000, 100);
+        String[] gbKeys = (String[]) gbD[0]; double[] gbVals = (double[]) gbD[1];
+        double gbRef = gbAggregate(gbKeys, gbVals);
+        assert(Math.abs(gbAggregate(gbKeys, gbVals) - gbRef) < 1e-6);
+        double gbCs = 0;
+        tmin = Long.MAX_VALUE;
+        for (int i = 0; i < NITER; ++i) {
+            t = System.nanoTime();
+            gbCs += gbAggregate(gbKeys, gbVals);
+            t = System.nanoTime() - t;
+            if (t < tmin) tmin = t;
+        }
+        print_perf("data_groupby_aggregate", tmin);
+
         // printfd
         tmin = Long.MAX_VALUE;
         for (int i=0; i<NITER; ++i) {
@@ -135,13 +150,13 @@ public class PerfPure {
 
     void printfd(int n) {
         try (PrintStream ps = new PrintStream(new FileOutputStream("/dev/null"))) {
-            for (long i = 0; i < n; i++) {
-                ps.println(i + " " + (i+1));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+            for (long i = 0; i < n; i++) { ps.println(i + " " + (i+1)); }
+        } catch (IOException e) { e.printStackTrace(); }
     }
+
+    // groupby
+    private static Object[] gbGenerate(int nr, int ng) { Random r = new Random(42); String[] k=new String[nr]; double[] v=new double[nr]; for(int i=0;i<nr;i++){k[i]=String.format("g%06d", r.nextInt(ng)); v[i]=r.nextDouble();} return new Object[]{k,v}; }
+    private static double gbAggregate(String[] k, double[] v) { var ht=new java.util.HashMap<String,double[]>(); for(int i=0;i<k.length;i++){double[] a=ht.get(k[i]); if(a==null){a=new double[]{1,v[i],v[i]*v[i]};ht.put(k[i],a);}else{a[0]++;a[1]+=v[i];a[2]+=v[i]*v[i];}} double cs=0; for(double[] a:ht.values())cs+=a[1]/a[0]; return cs; }
 
     private double randmatmul(int i) {
         SimpleMatrix a = SimpleMatrix.random_DDRM(i, i,  -1d, +1d, rand);
