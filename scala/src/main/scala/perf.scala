@@ -277,5 +277,17 @@ object Perf {
       tmin = math.min(tmin, System.nanoTime() - t)
     }
     printPerf("print_to_file", tmin)
+
+    // groupby
+    val (gbKeys, gbVals) = gbGenerate(50000, 100)
+    val gbRef = gbAggregate(gbKeys, gbVals)
+    assert(math.abs(gbAggregate(gbKeys, gbVals) - gbRef) < 1e-6)
+    var gbCs = 0.0; tmin = Long.MaxValue
+    for (_ <- 0 until NITER) { t = System.nanoTime(); gbCs += gbAggregate(gbKeys, gbVals); tmin = math.min(tmin, System.nanoTime() - t) }
+    sink = gbCs; printPerf("data_groupby_aggregate", tmin)
   }
+
+  // groupby
+  def gbGenerate(nr: Int, ng: Int): (Array[String], Array[Double]) = { val r = new scala.util.Random(42); (Array.tabulate(nr)(_ => f"g${r.nextInt(ng)}%06d"), Array.tabulate(nr)(_ => r.nextDouble())) }
+  def gbAggregate(k: Array[String], v: Array[Double]): Double = { val ht=scala.collection.mutable.Map[String,(Int,Double,Double)](); for (i <- k.indices) { val key=k(i); val x=v(i); val a=ht.getOrElse(key,(0,0.0,0.0)); ht(key)=(a._1+1,a._2+x,a._3+x*x) }; ht.values.map(a=>a._2/a._1).sum }
 }
