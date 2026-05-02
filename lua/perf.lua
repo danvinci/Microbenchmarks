@@ -217,3 +217,38 @@ if jit.os ~= 'Windows' then
 
     timeit(function() return printfd(100000) end, 'print_to_file')
 end
+
+-- k-nucleotide counting
+
+local kmer_alphabet = {'A', 'C', 'G', 'T'}
+
+local function generate_dna(n)
+    math.randomseed(42)
+    local t = {}
+    for i = 1, n do t[i] = kmer_alphabet[math.random(1, 4)] end
+    return table.concat(t)
+end
+
+local function count_kmers(seq, k)
+    local ht = {}
+    local limit = #seq - k + 1
+    for i = 1, limit do
+        local kmer = string.sub(seq, i, i + k - 1)
+        ht[kmer] = (ht[kmer] or 0) + 1
+    end
+    local total = 0
+    for _, v in pairs(ht) do total = total + v end
+    return total
+end
+
+local function k_nucleotide_perf(seq_len, k, iters)
+    local seq = generate_dna(seq_len)
+    local s = 0
+    for j = 1, iters do s = s + count_kmers(seq, k) end
+    return s
+end
+
+assert(k_nucleotide_perf(50000, 8, 1) == 50000 - 8 + 1)
+local knuc_ref = k_nucleotide_perf(50000, 8, 5)
+timeit(function() return k_nucleotide_perf(50000, 8, 5) end, 'string_k_nucleotide',
+    function(s) assert(s == knuc_ref) end)
