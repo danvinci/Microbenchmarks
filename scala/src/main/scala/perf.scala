@@ -277,5 +277,27 @@ object Perf {
       tmin = math.min(tmin, System.nanoTime() - t)
     }
     printPerf("print_to_file", tmin)
+
+    // reverse-complement
+    val rcRef = revcompPerf(50000, 20)
+    assert(revcompPerf(50000, 20) == rcRef)
+    var rcSum = 0L
+    tmin = Long.MaxValue
+    for (_ <- 0 until NITER) {
+      t = System.nanoTime()
+      rcSum += revcompPerf(50000, 20)
+      tmin = math.min(tmin, System.nanoTime() - t)
+    }
+    sink = rcSum
+    printPerf("string_reverse_complement", tmin)
   }
+
+  // reverse-complement
+
+  val rcAlphabet = Array[Byte]('A', 'C', 'G', 'T')
+  val rcComplement = { val t = new Array[Byte](256); t('A')='T'; t('C')='G'; t('G')='C'; t('T')='A'; t }
+
+  def genRcDna(n: Int): Array[Byte] = { val r = new scala.util.Random(42); Array.tabulate(n)(_ => rcAlphabet(r.nextInt(4))) }
+  def reverseComplement(buf: Array[Byte]): Array[Byte] = { var i=0; var j=buf.length-1; while (i<=j) { val ci=rcComplement(buf(i)); val cj=rcComplement(buf(j)); buf(i)=cj; buf(j)=ci; i+=1; j-=1 }; buf }
+  def revcompPerf(n: Int, iters: Int): Long = { val seq = genRcDna(n); val buf = seq.clone(); for (_ <- 0 until iters) reverseComplement(buf); buf.foldLeft(0L)((s,b) => s + (b & 0xFF)) }
 }
