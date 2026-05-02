@@ -178,10 +178,14 @@ end module
 
 module bench
 use utils, only: trace, randn, std, mean, stop_error
-use types, only: dp
+use types, only: dp, i64
 implicit none
 private
-public fib, parse_int, printfd, quicksort, mandelperf, pisum, randmatstat, randmatmul
+public fib, parse_int, printfd, quicksort, mandelperf, pisum, randmatstat, randmatmul, &
+    generate_dna, count_kmers, k_nucleotide_perf
+
+! k-nucleotide RNG state
+character(len=1), parameter :: kmer_alphabet(4) = ['A', 'C', 'G', 'T']
 
 contains
 
@@ -192,6 +196,65 @@ if (n < 2) then
 else
     r = fib(n-1) + fib(n-2)
 end if
+end function
+
+! k-nucleotide counting
+
+subroutine knuc_seed_fixed()
+    integer :: n
+    integer, allocatable :: seed(:)
+    call random_seed(size=n); allocate(seed(n)); seed = 42
+    call random_seed(put=seed); deallocate(seed)
+end subroutine
+
+subroutine generate_dna(seq, n)
+    integer, intent(in) :: n
+    character(len=:), allocatable, intent(out) :: seq
+    integer :: i, idx
+    real :: x
+    allocate(character(len=n) :: seq)
+    call knuc_seed_fixed()
+    do i = 1, n
+        call random_number(x)
+        idx = int(x * 4) + 1
+        if (idx > 4) idx = 4
+        seq(i:i) = kmer_alphabet(idx)
+    end do
+end subroutine
+
+integer function count_kmers(seq, k) result(total)
+    character(len=*), intent(in) :: seq
+    integer, intent(in) :: k
+    integer, allocatable :: counts(:)
+    integer :: i, limit, code, v
+    limit = len(seq) - k + 1
+    allocate(counts(0:65535))
+    counts = 0
+    do i = 1, limit
+        code = 0
+        do v = 1, k
+            select case (seq(i+v-1:i+v-1))
+            case ('C'); code = code + ishft(1, 2*(v-1))
+            case ('G'); code = code + ishft(2, 2*(v-1))
+            case ('T'); code = code + ishft(3, 2*(v-1))
+            end select
+        end do
+        counts(code) = counts(code) + 1
+    end do
+    total = sum(counts)
+    deallocate(counts)
+end function
+
+integer function k_nucleotide_perf(seq_len, k, iters) result(s)
+    integer, intent(in) :: seq_len, k, iters
+    character(len=:), allocatable :: seq
+    integer :: j
+    call generate_dna(seq, seq_len)
+    s = 0
+    do j = 1, iters
+        s = s + count_kmers(seq, k)
+    end do
+    deallocate(seq)
 end function
 
 integer function parse_int(s, base) result(n)
@@ -358,7 +421,7 @@ program perf
 use types, only: dp, i64
 use utils, only: assert, init_random_seed, sysclock2ms, hex_string
 use bench, only: fib, parse_int, printfd, quicksort, mandelperf, pisum, randmatstat, &
-    randmatmul
+    randmatmul, generate_dna, count_kmers, k_nucleotide_perf
 implicit none
 
 integer, parameter :: NRUNS = 1000
@@ -368,6 +431,7 @@ integer(i64) :: t1, t2, tmin
 real(dp) :: pi, s1, s2
 real(dp), allocatable :: C(:, :), d(:)
 character(len=11) :: s
+integer :: km_sum, km_s
 
 call init_random_seed()
 
@@ -465,5 +529,18 @@ do i = 1, 5
     if (t2-t1 < tmin) tmin = t2-t1
 end do
 print "('fortran,matrix_multiply,',f0.6)", sysclock2ms(tmin)
+
+! k-nucleotide
+km_sum = 0
+tmin = huge(0_i64)
+do i = 1, 5
+    call system_clock(t1)
+    km_s = k_nucleotide_perf(50000, 8, 5)
+    call system_clock(t2)
+    km_sum = km_sum + km_s
+    if (t2-t1 < tmin) tmin = t2-t1
+end do
+call assert(km_sum == 5 * (50000 - 8 + 1) * 5)
+print "('fortran,string_k_nucleotide,',f0.6)", sysclock2ms(tmin)
 
 end program
