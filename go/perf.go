@@ -215,6 +215,35 @@ func pisum() float64 {
 
 const NITER = 5
 
+// reverse-complement
+
+var rcAlphabet = []byte("ACGT")
+var rcComplement = [256]byte{'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A'}
+
+func genRcDna(n int) string {
+    r := rand.New(rand.NewSource(42))
+    buf := make([]byte, n)
+    for i := 0; i < n; i++ { buf[i] = rcAlphabet[r.Intn(4)] }
+    return string(buf)
+}
+func reverseComplement(seq string) string {
+    buf := []byte(seq)
+    i, j := 0, len(buf)-1
+    for i <= j {
+        ci := rcComplement[buf[i]]
+        cj := rcComplement[buf[j]]
+        buf[i] = cj
+        buf[j] = ci
+        i++; j--
+    }
+    return string(buf)
+}
+func revcompPerf(seqLen, iters int) string {
+    seq := genRcDna(seqLen)
+    for j := 0; j < iters; j++ { seq = reverseComplement(seq) }
+    return seq
+}
+
 func print_perf(name string, t float64) {
 	fmt.Printf("go,%v,%v\n", name, t*1000)
 }
@@ -293,5 +322,11 @@ func main() {
 
 	timeit("print_to_file", func() {
 		printfd(100000)
+	})
+
+	rcRef := revcompPerf(50000, 20)
+	if revcompPerf(50000, 20) != rcRef { panic("revcompPerf not deterministic") }
+	timeit("string_reverse_complement", func() {
+		revcompPerf(50000, 20)
 	})
 }
