@@ -1,5 +1,5 @@
 from numpy import *
-from numpy.random import rand, randn
+from numpy.random import rand, randn, seed, randint
 from numpy.linalg import matrix_power
 import sys
 import time
@@ -7,6 +7,24 @@ import random
 
 if sys.version_info < (3,):
     range = xrange
+
+## graph BFS ##
+
+def bfs_create(V, E):
+    seed(42)
+    adj = [[] for _ in range(V)]
+    for _ in range(E): u = randint(0, V); v = randint(0, V); adj[u].append(v); adj[v].append(u)
+    return adj
+
+def bfs_search(adj, start):
+    V = len(adj); visited = [False] * V; queue = [start]; visited[start] = True; count = 1
+    while queue:
+        u = queue.pop(0)
+        for v in adj[u]:
+            if not visited[v]: visited[v] = True; queue.append(v); count += 1
+    return count
+
+def bfs_perf(adj): return bfs_search(adj, 0)
 
 ## fibonacci ##
 
@@ -190,6 +208,17 @@ if __name__=="__main__":
         t = time.time()-t
         if t < tmin: tmin = t
     print_perf ("matrix_multiply", tmin)
+
+    bfs_adj = bfs_create(5000, 20000)
+    bfs_ref = bfs_search(bfs_adj, 0)
+    assert bfs_search(bfs_adj, 0) == bfs_ref
+    tmin = float('inf')
+    for i in range(mintrials):
+        t = time.time()
+        bfs_perf(bfs_adj)
+        t = time.time()-t
+        if t < tmin: tmin = t
+    print_perf("algorithm_graph_bfs", tmin)
 
     tmin = float('inf')
     for i in range(mintrials):
