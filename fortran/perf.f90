@@ -181,7 +181,10 @@ use utils, only: trace, randn, std, mean, stop_error
 use types, only: dp
 implicit none
 private
-public fib, parse_int, printfd, quicksort, mandelperf, pisum, randmatstat, randmatmul
+public fib, parse_int, printfd, quicksort, mandelperf, pisum, randmatstat, randmatmul, &
+    gen_rc_dna, reverse_complement
+
+character(len=1), parameter :: rc_alpha(4) = ['A', 'C', 'G', 'T']
 
 contains
 
@@ -193,6 +196,43 @@ else
     r = fib(n-1) + fib(n-2)
 end if
 end function
+
+! reverse-complement
+
+subroutine rc_seed_fixed()
+    integer :: n
+    integer, allocatable :: seed(:)
+    call random_seed(size=n); allocate(seed(n)); seed = 42
+    call random_seed(put=seed); deallocate(seed)
+end subroutine
+
+subroutine gen_rc_dna(seq, n)
+    integer, intent(in) :: n
+    character(len=:), allocatable, intent(out) :: seq
+    integer :: i, idx
+    real :: x
+    allocate(character(len=n) :: seq)
+    call rc_seed_fixed()
+    do i = 1, n
+        call random_number(x)
+        idx = int(x * 4) + 1
+        if (idx > 4) idx = 4
+        seq(i:i) = rc_alpha(idx)
+    end do
+end subroutine
+
+subroutine reverse_complement(seq)
+    character(len=*), intent(inout) :: seq
+    integer :: i, j
+    character(len=1) :: ci, cj
+    i = 1; j = len(seq)
+    do while (i <= j)
+        select case (seq(i:i)); case ('A'); ci = 'T'; case ('C'); ci = 'G'; case ('G'); ci = 'C'; case ('T'); ci = 'A'; end select
+        select case (seq(j:j)); case ('A'); cj = 'T'; case ('C'); cj = 'G'; case ('G'); cj = 'C'; case ('T'); cj = 'A'; end select
+        seq(i:i) = cj; seq(j:j) = ci
+        i = i + 1; j = j - 1
+    end do
+end subroutine
 
 integer function parse_int(s, base) result(n)
 character(len=*), intent(in) :: s
@@ -358,7 +398,7 @@ program perf
 use types, only: dp, i64
 use utils, only: assert, init_random_seed, sysclock2ms, hex_string
 use bench, only: fib, parse_int, printfd, quicksort, mandelperf, pisum, randmatstat, &
-    randmatmul
+    randmatmul, gen_rc_dna, reverse_complement
 implicit none
 
 integer, parameter :: NRUNS = 1000
@@ -465,5 +505,29 @@ do i = 1, 5
     if (t2-t1 < tmin) tmin = t2-t1
 end do
 print "('fortran,matrix_multiply,',f0.6)", sysclock2ms(tmin)
+
+! reverse-complement
+block
+    character(len=:), allocatable :: rc_seq, rc_buf
+    integer :: rc_ref, rc_sum, rc_idx
+    call gen_rc_dna(rc_seq, 50000)
+    allocate(character(len=50000) :: rc_buf)
+    rc_buf = rc_seq
+    do k = 1, 20; call reverse_complement(rc_buf); end do
+    rc_ref = 0; do rc_idx = 1, 50000; rc_ref = rc_ref + iachar(rc_buf(rc_idx:rc_idx)); end do
+    rc_sum = 0
+    tmin = huge(0_i64)
+    do i = 1, 5
+        rc_buf = rc_seq
+        call system_clock(t1)
+        do k = 1, 20; call reverse_complement(rc_buf); end do
+        call system_clock(t2)
+        do rc_idx = 1, 50000; rc_sum = rc_sum + iachar(rc_buf(rc_idx:rc_idx)); end do
+        if (t2-t1 < tmin) tmin = t2-t1
+    end do
+    call assert(rc_sum == rc_ref * 5)
+    deallocate(rc_seq, rc_buf)
+end block
+print "('fortran,string_reverse_complement,',f0.6)", sysclock2ms(tmin)
 
 end program
