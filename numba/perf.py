@@ -1,11 +1,28 @@
 from numpy import *
-from numpy.random import rand, randn
+from numpy.random import rand, randn, seed, randint
 from numpy.linalg import matrix_power
 import sys
 import time
 import random
-from numba import njit, types
-from numba.typed import List as NumbaList
+from numba import njit
+
+## graph BFS ##
+
+def bfs_create_n(V, E):
+    seed(42)
+    adj = [[] for _ in range(V)]
+    for _ in range(E):
+        u = randint(0, V); v = randint(0, V)
+        adj[u].append(v); adj[v].append(u)
+    return adj
+
+def bfs_search_n(adj, start):
+    V = len(adj); vis = [False] * V; q = [start]; vis[start] = True; cnt = 1
+    while q:
+        u = q.pop(0)
+        for v in adj[u]:
+            if not vis[v]: vis[v] = True; q.append(v); cnt += 1
+    return cnt
 
 ## fibonacci ##
 
@@ -200,3 +217,14 @@ if __name__ == "__main__":
         t = time.time()-t
         if t < tmin: tmin = t
     print_perf ("print_to_file", tmin)
+
+    bfs_adj_n = bfs_create_n(5000, 20000)
+    bfs_ref = bfs_search_n(bfs_adj_n, 0)
+    assert bfs_search_n(bfs_adj_n, 0) == bfs_ref
+    tmin = float('inf')
+    for i in range(mintrials):
+        t = time.time()
+        bfs_search_n(bfs_adj_n, 0)
+        t = time.time()-t
+        if t < tmin: tmin = t
+    print_perf("algorithm_graph_bfs", tmin)
