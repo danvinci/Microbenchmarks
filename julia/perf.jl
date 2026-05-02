@@ -133,6 +133,41 @@ end
 
 @timeit rand(1000, 1000) * rand(1000, 1000) "matrix_multiply"
 
+## k-nucleotide counting ##
+
+function generate_dna(len::Int)
+    seed!(42)
+    return String(rand(['A', 'C', 'G', 'T'], len))
+end
+
+function count_kmers(seq::String, k::Int, ht::Dict{String,Int})
+    empty!(ht)
+    limit = ncodeunits(seq) - k + 1
+    for i = 1:limit
+        kmer = SubString(seq, i, i + k - 1)
+        ht[kmer] = get(ht, kmer, 0) + 1
+    end
+    return sum(values(ht))
+end
+
+function k_nucleotide_perf(seq_len, k, iters)
+    seq = generate_dna(seq_len)
+    ht = Dict{String,Int}()
+    s = 0
+    for j = 1:iters
+        s += count_kmers(seq, k, ht)
+    end
+    return s
+end
+
+kmer_len = 50000
+kmer_k = 8
+kmer_iters = 5
+@test k_nucleotide_perf(kmer_len, kmer_k, 1) == kmer_len - kmer_k + 1
+knuc_ref = k_nucleotide_perf(kmer_len, kmer_k, kmer_iters)
+@test k_nucleotide_perf(kmer_len, kmer_k, kmer_iters) == knuc_ref
+@timeit k_nucleotide_perf(kmer_len, kmer_k, kmer_iters) "string_k_nucleotide"
+
 ## printfd ##
 
 if Sys.isunix()
