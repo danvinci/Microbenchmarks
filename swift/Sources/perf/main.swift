@@ -35,6 +35,43 @@ func blackHole<T>(_ x: T) {
 }
 
 // ---------------------------------------------------------------------------
+// k-nucleotide counting
+// ---------------------------------------------------------------------------
+
+var kmerRngState: UInt32 = 42
+let kmerAlphabet: [UInt8] = [UInt8(ascii: "A"), UInt8(ascii: "C"), UInt8(ascii: "G"), UInt8(ascii: "T")]
+
+func knucNextBase() -> UInt8 {
+    kmerRngState = kmerRngState &* 1664525 &+ 1013904223
+    return kmerAlphabet[Int((kmerRngState >> 16) & 3)]
+}
+
+func generateDna(_ n: Int) -> [UInt8] {
+    kmerRngState = 42
+    var buf = [UInt8](repeating: 0, count: n)
+    for i in 0..<n { buf[i] = knucNextBase() }
+    return buf
+}
+
+func countKmers(_ seq: [UInt8], _ k: Int) -> Int {
+    var ht = [ArraySlice<UInt8>: Int]()
+    let limit = seq.count - k + 1
+    for i in 0..<limit {
+        ht[seq[i..<i+k], default: 0] += 1
+    }
+    var total = 0
+    for v in ht.values { total += v }
+    return total
+}
+
+func kNucleotidePerf(seqLen: Int, k: Int, iters: Int) -> Int {
+    let seq = generateDna(seqLen)
+    var s = 0
+    for _ in 0..<iters { s += countKmers(seq, k) }
+    return s
+}
+
+// ---------------------------------------------------------------------------
 // Fibonacci
 // ---------------------------------------------------------------------------
 
@@ -414,3 +451,21 @@ for _ in 0..<NITER {
     if elapsed < tmin { tmin = elapsed }
 }
 printPerf("print_to_file", tmin)
+
+// k-nucleotide
+let kmerSeqLen = 50000
+let kmerK = 8
+let kmerIters = 5
+precondition(kNucleotidePerf(seqLen: kmerSeqLen, k: kmerK, iters: 1) == kmerSeqLen - kmerK + 1)
+var kmerSum = 0
+tmin = Double.infinity
+for _ in 0..<NITER {
+    let t = clockNow()
+    let s = kNucleotidePerf(seqLen: kmerSeqLen, k: kmerK, iters: kmerIters)
+    kmerSum += s
+    let elapsed = clockNow() - t
+    if elapsed < tmin { tmin = elapsed }
+}
+blackHole(kmerSum)
+precondition(kmerSum == kmerIters * (kmerSeqLen - kmerK + 1) * NITER)
+printPerf("string_k_nucleotide", tmin)
