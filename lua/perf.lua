@@ -217,3 +217,11 @@ if jit.os ~= 'Windows' then
 
     timeit(function() return printfd(100000) end, 'print_to_file')
 end
+
+-- graph BFS
+local function bfs_create(V,E) math.randomseed(42); local adj={}; for i=1,V do adj[i]={} end; for i=1,E do local u=math.random(V);local v=math.random(V);adj[u][#adj[u]+1]=v;adj[v][#adj[v]+1]=u end; return adj end
+local function bfs_search(adj,start) local V=#adj;local vis={};for i=1,V do vis[i]=false end;local q={start};vis[start]=true;local cnt=1;while #q>0 do local u=table.remove(q,1);for _,v in ipairs(adj[u]) do if not vis[v] then vis[v]=true;q[#q+1]=v;cnt=cnt+1 end end end; return cnt end
+local bfs_adj=bfs_create(5000,20000)
+local bfs_ref=bfs_search(bfs_adj,1)
+timeit(function() return bfs_search(bfs_adj,1) end, 'algorithm_graph_bfs',
+    function(c) assert(c == bfs_ref) end)
