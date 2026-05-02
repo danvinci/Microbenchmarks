@@ -215,6 +215,28 @@ func pisum() float64 {
 
 const NITER = 5
 
+// N-body simulation
+
+type nbodySys struct {
+    x, y, z, vx, vy, vz, m []float64
+}
+
+func nbodyInit(n int) *nbodySys {
+    r := rand.New(rand.NewSource(42))
+    invN := 1.0 / float64(n)
+    sys := &nbodySys{make([]float64, n), make([]float64, n), make([]float64, n), make([]float64, n), make([]float64, n), make([]float64, n), make([]float64, n)}
+    for i := 0; i < n; i++ { sys.x[i] = r.Float64()*2-1; sys.y[i] = r.Float64()*2-1; sys.z[i] = r.Float64()*2-1; sys.vx[i] = (r.Float64()-0.5)*0.1; sys.vy[i] = (r.Float64()-0.5)*0.1; sys.vz[i] = (r.Float64()-0.5)*0.1; sys.m[i] = r.Float64() * invN }
+    return sys
+}
+func nbodyStep(sys *nbodySys, dt float64) {
+    G, eps2 := 1.0, 1e-4; n := len(sys.x)
+    for i := 0; i < n; i++ { fx, fy, fz := 0.0, 0.0, 0.0; xi, yi, zi := sys.x[i], sys.y[i], sys.z[i]
+        for j := 0; j < n; j++ { dx := sys.x[j]-xi; dy := sys.y[j]-yi; dz := sys.z[j]-zi; dsq := dx*dx+dy*dy+dz*dz+eps2; inv := 1.0/math.Sqrt(dsq); inv3 := inv*inv*inv; fx += dx*inv3*sys.m[j]; fy += dy*inv3*sys.m[j]; fz += dz*inv3*sys.m[j] }
+        sys.vx[i] += dt*G*fx; sys.vy[i] += dt*G*fy; sys.vz[i] += dt*G*fz }
+    for i := 0; i < n; i++ { sys.x[i] += dt*sys.vx[i]; sys.y[i] += dt*sys.vy[i]; sys.z[i] += dt*sys.vz[i] }
+}
+func nbodyPerf(n int, steps int, dt float64) float64 { sys := nbodyInit(n); for s := 0; s < steps; s++ { nbodyStep(sys, dt) }; cs := 0.0; for i := 0; i < n; i++ { cs += sys.x[i]+sys.y[i]+sys.z[i] }; return cs }
+
 func print_perf(name string, t float64) {
 	fmt.Printf("go,%v,%v\n", name, t*1000)
 }
@@ -293,5 +315,11 @@ func main() {
 
 	timeit("print_to_file", func() {
 		printfd(100000)
+	})
+
+	nbRef := nbodyPerf(1000, 10, 0.01)
+	if math.Abs(nbodyPerf(1000, 10, 0.01)-nbRef) > 1e-6 { panic("nbodyPerf not deterministic") }
+	timeit("simulation_nbody", func() {
+		nbodyPerf(1000, 10, 0.01)
 	})
 }
