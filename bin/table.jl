@@ -14,6 +14,7 @@ const benchmark_order = [
     "matrix_statistics",
     "matrix_multiply",
     "userfunc_mandelbrot",
+    "string_k_nucleotide",
 ]
 
 const versions = Dict{String, String}()
