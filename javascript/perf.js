@@ -453,4 +453,24 @@ const fs = require('fs'); // for print to file benchmark
     t = (new Date()).getTime()-t;
     if (t < tmin) { tmin=t; }
     console.log("javascript,matrix_multiply," + tmin);
+
+    // N-body simulation
+    var nbRng = 42;
+    function nbRand() { nbRng = (nbRng * 1664525 + 1013904223) >>> 0; return (nbRng & 0x7FFFFFFF) / 0x7FFFFFFF; }
+    function nbodyInit(n) { nbRng = 42; var invN = 1.0 / n, x=[], y=[], z=[], vx=[], vy=[], vz=[], m=[], i;
+        for (i=0; i<n; i++) { var r = nbRand(); x.push(r*2-1); r=nbRand(); y.push(r*2-1); r=nbRand(); z.push(r*2-1); vx.push((nbRand()-0.5)*0.1); vy.push((nbRand()-0.5)*0.1); vz.push((nbRand()-0.5)*0.1); m.push(nbRand()*invN); }
+        return {x:x, y:y, z:z, vx:vx, vy:vy, vz:vz, m:m, n:n}; }
+    function nbodyStep(sys, dt) { var G=1, eps2=1e-4, x=sys.x, y=sys.y, z=sys.z, vx=sys.vx, vy=sys.vy, vz=sys.vz, m=sys.m, n=sys.n, i, j, dx, dy, dz, dsq, inv, inv3;
+        for (i=0; i<n; i++) { var fx=0, fy=0, fz=0, xi=x[i], yi=y[i], zi=z[i];
+            for (j=0; j<n; j++) { dx=x[j]-xi; dy=y[j]-yi; dz=z[j]-zi; dsq=dx*dx+dy*dy+dz*dz+eps2; inv=1/Math.sqrt(dsq); inv3=inv*inv*inv; fx+=dx*inv3*m[j]; fy+=dy*inv3*m[j]; fz+=dz*inv3*m[j]; }
+            vx[i]+=dt*G*fx; vy[i]+=dt*G*fy; vz[i]+=dt*G*fz; }
+        for (i=0; i<n; i++) { x[i]+=dt*vx[i]; y[i]+=dt*vy[i]; z[i]+=dt*vz[i]; } }
+    function nbodyPerf(n, steps, dt) { var sys = nbodyInit(n), s;
+        for (s=0; s<steps; s++) nbodyStep(sys, dt);
+        var cs=0, i; for (i=0; i<n; i++) cs+=sys.x[i]+sys.y[i]+sys.z[i]; return cs; }
+    var nbRef = nbodyPerf(1000, 10, 0.01);
+    assert(Math.abs(nbodyPerf(1000, 10, 0.01) - nbRef) < 1e-6);
+    tmin = Number.POSITIVE_INFINITY;
+    for (var trial=0; trial<5; trial++) { t = (new Date()).getTime(); nbodyPerf(1000,10,0.01); t = (new Date()).getTime()-t; if (t<tmin) tmin=t; }
+    console.log("javascript,simulation_nbody," + tmin);
 }());
