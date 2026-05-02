@@ -1,5 +1,5 @@
 from numpy import *
-from numpy.random import rand, randn
+from numpy.random import rand, randn, seed, randint
 from numpy.linalg import matrix_power
 import sys
 import time
@@ -7,6 +7,31 @@ import random
 
 if sys.version_info < (3,):
     range = xrange
+
+## reverse-complement ##
+
+_RC_COMPLEMENT = {ord('A'): ord('T'), ord('C'): ord('G'), ord('G'): ord('C'), ord('T'): ord('A')}
+
+def gen_rc_dna(n):
+    seed(42)
+    return bytes(b'ACGT'[i] for i in randint(0, 4, n))
+
+def reverse_complement(buf):
+    arr = bytearray(buf)
+    i, j = 0, len(arr) - 1
+    while i <= j:
+        ci, cj = _RC_COMPLEMENT[arr[i]], _RC_COMPLEMENT[arr[j]]
+        arr[i] = cj
+        arr[j] = ci
+        i += 1
+        j -= 1
+    return bytes(arr)
+
+def revcomp_perf(seq_len, iters):
+    seq = gen_rc_dna(seq_len)
+    for j in range(iters):
+        seq = reverse_complement(seq)
+    return seq
 
 ## fibonacci ##
 
@@ -190,6 +215,16 @@ if __name__=="__main__":
         t = time.time()-t
         if t < tmin: tmin = t
     print_perf ("matrix_multiply", tmin)
+
+    rc_ref = revcomp_perf(50000, 20)
+    assert revcomp_perf(50000, 20) == rc_ref
+    tmin = float('inf')
+    for i in range(mintrials):
+        t = time.time()
+        revcomp_perf(50000, 20)
+        t = time.time()-t
+        if t < tmin: tmin = t
+    print_perf("string_reverse_complement", tmin)
 
     tmin = float('inf')
     for i in range(mintrials):
