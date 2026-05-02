@@ -44,7 +44,12 @@ function perf()
 	timeit('matrix_multiply', @randmatmul, 1000);
 
 	printfd(1)
-	timeit('print_to_file', @printfd, 100000)
+    timeit('print_to_file', @printfd, 100000)
+
+    [gb_keys, gb_vals] = gb_generate(50000, 100);
+    gb_ref = gb_aggregate(gb_keys, gb_vals);
+    assert(abs(gb_aggregate(gb_keys, gb_vals) - gb_ref) < 1e-6);
+    timeit('data_groupby_aggregate', @gb_aggregate, gb_keys, gb_vals)
 
 end
 
@@ -231,4 +236,29 @@ function printfd(n)
         fprintf(f, '%d %d\n', i, i + 1);
     end
     fclose(f);
+end
+
+%% groupby aggregation %%
+
+function [keys, vals] = gb_generate(nr, ng)
+    rand("state", 42);
+    keys = cell(1, nr); vals = zeros(1, nr);
+    for i = 1:nr
+        keys{i} = sprintf("g%06d", randi(ng) - 1);
+        vals(i) = rand();
+    end
+end
+
+function cs = gb_aggregate(keys, vals)
+    ht = containers.Map();
+    for i = 1:length(keys)
+        k = keys{i};
+        if isKey(ht, k)
+            a = ht(k); a(1) = a(1) + 1; a(2) = a(2) + vals(i); a(3) = a(3) + vals(i)^2; ht(k) = a;
+        else
+            ht(k) = [1, vals(i), vals(i)^2];
+        end
+    end
+    cs = 0; ks = ht.keys();
+    for j = 1:length(ks); a = ht(ks{j}); cs = cs + a(2) / a(1); end
 end
