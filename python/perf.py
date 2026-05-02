@@ -1,5 +1,5 @@
 from numpy import *
-from numpy.random import rand, randn
+from numpy.random import rand, randn, seed, randint
 from numpy.linalg import matrix_power
 import sys
 import time
@@ -7,6 +7,25 @@ import random
 
 if sys.version_info < (3,):
     range = xrange
+
+## groupby aggregation ##
+
+def groupby_generate(n_rows, n_groups):
+    seed(42)
+    keys = [f'g{randint(0, n_groups):06d}' for _ in range(n_rows)]
+    vals = list(rand(n_rows))
+    return keys, vals
+
+def groupby_aggregate(keys, vals):
+    ht = {}
+    for k, v in zip(keys, vals):
+        if k in ht:
+            ht[k][0] += 1; ht[k][1] += v; ht[k][2] += v * v
+        else:
+            ht[k] = [1, v, v * v]
+    cs = 0.0
+    for c, s, _ in ht.values(): cs += s / c
+    return cs
 
 ## fibonacci ##
 
@@ -190,6 +209,17 @@ if __name__=="__main__":
         t = time.time()-t
         if t < tmin: tmin = t
     print_perf ("matrix_multiply", tmin)
+
+    gb_keys, gb_vals = groupby_generate(50000, 100)
+    gb_ref = groupby_aggregate(gb_keys, gb_vals)
+    assert groupby_aggregate(gb_keys, gb_vals) == gb_ref
+    tmin = float('inf')
+    for i in range(mintrials):
+        t = time.time()
+        groupby_aggregate(gb_keys, gb_vals)
+        t = time.time()-t
+        if t < tmin: tmin = t
+    print_perf("data_groupby_aggregate", tmin)
 
     tmin = float('inf')
     for i in range(mintrials):
