@@ -179,3 +179,20 @@ randmatmul = function(n) {
 
 assert(randmatmul(1000)[1] >= 0)
 timeit("matrix_multiply", randmatmul, 1000)
+
+## reverse-complement ##
+
+rc_alphabet = c('A', 'C', 'G', 'T')
+rc_complement = c('T', 'G', 'C', 'A'); names(rc_complement) = c('A', 'C', 'G', 'T')
+
+gen_rc_dna = function(n) { set.seed(42); paste(rc_alphabet[sample.int(4, n, replace=TRUE)], collapse='') }
+reverse_complement = function(seq) {
+    chars = strsplit(seq, '')[[1]]
+    i = 1; j = nchar(seq)
+    while (i <= j) { ci = rc_complement[chars[i]]; cj = rc_complement[chars[j]]; chars[i] = cj; chars[j] = ci; i = i + 1; j = j - 1 }
+    paste(chars, collapse='')
+}
+revcomp_perf = function(seq_len, iters) { seq = gen_rc_dna(seq_len); for (j in 1:iters) seq = reverse_complement(seq); seq }
+
+rc_ref = revcomp_perf(50000, 20); assert(revcomp_perf(50000, 20) == rc_ref)
+timeit("string_reverse_complement", revcomp_perf, 50000, 20)
