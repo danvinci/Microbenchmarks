@@ -217,3 +217,36 @@ if jit.os ~= 'Windows' then
 
     timeit(function() return printfd(100000) end, 'print_to_file')
 end
+
+-- reverse-complement
+
+local rc_alphabet = {'A', 'C', 'G', 'T'}
+local rc_complement = {['A']='T', ['C']='G', ['G']='C', ['T']='A'}
+
+local function gen_rc_dna(n)
+    local state = 42
+    local t = {}
+    for i = 1, n do
+        state = (state * 1664525 + 1013904223) % 4294967296
+        t[i] = rc_alphabet[(math.floor(state / 65536) % 4) + 1]
+    end
+    return table.concat(t)
+end
+local function reverse_complement(seq)
+    local t, i, j = {}, 1, #seq
+    while i <= j do
+        local ci = rc_complement[string.sub(seq, i, i)]
+        local cj = rc_complement[string.sub(seq, j, j)]
+        t[i] = cj; t[j] = ci; i = i + 1; j = j - 1
+    end
+    return table.concat(t)
+end
+local function revcomp_perf(seq_len, iters)
+    local seq = gen_rc_dna(seq_len)
+    for j = 1, iters do seq = reverse_complement(seq) end
+    return seq
+end
+
+local rc_ref = revcomp_perf(50000, 20)
+timeit(function() return revcomp_perf(50000, 20) end, 'string_reverse_complement',
+    function(s) assert(s == rc_ref) end)
