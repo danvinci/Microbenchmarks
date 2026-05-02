@@ -453,4 +453,45 @@ const fs = require('fs'); // for print to file benchmark
     t = (new Date()).getTime()-t;
     if (t < tmin) { tmin=t; }
     console.log("javascript,matrix_multiply," + tmin);
+
+    // reverse-complement
+    var rcRngState = 42, rcAlphabet = "ACGT";
+    var rcMapA = 'A'.charCodeAt(0), rcMapC = 'C'.charCodeAt(0), rcMapG = 'G'.charCodeAt(0), rcMapT = 'T'.charCodeAt(0);
+    var rcComplement = {}; rcComplement[rcMapA] = rcMapT; rcComplement[rcMapC] = rcMapG; rcComplement[rcMapG] = rcMapC; rcComplement[rcMapT] = rcMapA;
+
+    function rcNextBase() {
+        rcRngState = (rcRngState * 1664525 + 1013904223) >>> 0;
+        return rcAlphabet[(rcRngState >>> 16) & 3];
+    }
+    function genRcDna(n) {
+        rcRngState = 42;
+        var arr = new Array(n), i;
+        for (i = 0; i < n; i++) arr[i] = rcNextBase();
+        return arr.join('');
+    }
+    function reverseComplement(seq) {
+        var arr = [], i = 0, j = seq.length - 1;
+        while (i <= j) {
+            var ci = rcComplement[seq.charCodeAt(i)], cj = rcComplement[seq.charCodeAt(j)];
+            arr[i] = String.fromCharCode(cj);
+            arr[j] = String.fromCharCode(ci);
+            i++; j--;
+        }
+        return arr.join('');
+    }
+    function revcompPerf(seqLen, iters) {
+        var seq = genRcDna(seqLen), j;
+        for (j = 0; j < iters; j++) seq = reverseComplement(seq);
+        return seq;
+    }
+    var rcRef = revcompPerf(50000, 20);
+    assert(revcompPerf(50000, 20) === rcRef);
+    tmin = Number.POSITIVE_INFINITY;
+    for (var trial = 0; trial < 5; trial++) {
+        t = (new Date()).getTime();
+        revcompPerf(50000, 20);
+        t = (new Date()).getTime() - t;
+        if (t < tmin) tmin = t;
+    }
+    console.log("javascript,string_reverse_complement," + tmin);
 }());
