@@ -179,3 +179,10 @@ randmatmul = function(n) {
 
 assert(randmatmul(1000)[1] >= 0)
 timeit("matrix_multiply", randmatmul, 1000)
+
+## groupby ##
+
+gb_generate = function(nr, ng) { set.seed(42); list(k=sprintf("g%06d", sample.int(ng, nr, replace=TRUE) - 1L), v=runif(nr)) }
+gb_aggregate = function(k, v) { ht=new.env(hash=TRUE,parent=emptyenv()); for (i in seq_along(k)) { key=k[i]; if (exists(key,envir=ht,inherits=FALSE)) { a=get(key,envir=ht); a[1]=a[1]+1;a[2]=a[2]+v[i];a[3]=a[3]+v[i]^2;assign(key,a,envir=ht) } else { assign(key,c(1,v[i],v[i]^2),envir=ht) } }; cs=0; for (a in as.list(ht,all.names=TRUE)) cs=cs+a[2]/a[1]; cs }
+gb_d = gb_generate(50000, 100); gb_ref = gb_aggregate(gb_d$k, gb_d$v); assert(gb_aggregate(gb_d$k, gb_d$v) == gb_ref)
+timeit("data_groupby_aggregate", gb_aggregate, gb_d$k, gb_d$v)
