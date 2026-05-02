@@ -133,6 +133,41 @@ end
 
 @timeit rand(1000, 1000) * rand(1000, 1000) "matrix_multiply"
 
+## graph BFS ##
+
+function bfs_create(V::Int, E::Int)
+    adj = [Int[] for _ = 1:V]
+    for _ = 1:E
+        u = rand(1:V); v = rand(1:V)
+        push!(adj[u], v); push!(adj[v], u)
+    end
+    return adj
+end
+
+function bfs_search(adj::Vector{Vector{Int}}, start::Int)
+    V = length(adj)
+    visited = zeros(Bool, V)
+    queue = Int[]
+    visited[start] = true; push!(queue, start); count = 1
+    while !isempty(queue)
+        u = popfirst!(queue)
+        for v in adj[u]
+            if !visited[v]; visited[v] = true; push!(queue, v); count += 1; end
+        end
+    end
+    return count
+end
+
+function bfs_perf(V, E)
+    adj = bfs_create(V, E)
+    return bfs_search(adj, 1)
+end
+
+bfs_adj = bfs_create(5000, 20000)
+bfs_ref = bfs_search(bfs_adj, 1)
+@test bfs_search(bfs_adj, 1) == bfs_ref
+@timeit bfs_search(bfs_adj, 1) "algorithm_graph_bfs"
+
 ## printfd ##
 
 if Sys.isunix()
